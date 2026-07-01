@@ -56,7 +56,6 @@ class WriteAsLangchainDocuments:
 
     def write_sentences(self, output_json_filename):
         with open(output_json_filename, "w+") as output_json_file:
-            # output_json_file.write("[")
             collected_sentences = []
             for chapter in self._document.get_chapters():
                 collected_sentences.extend(
@@ -68,11 +67,4 @@ class WriteAsLangchainDocuments:
                 fp=output_json_file,
                 indent=4,
             )
-            # output_json_file.write("]")
 
-            #                 json.dump(
-            #             sentence,
-            #             cls=LangChainDocumentEncoder,
-            #             fp=output_json_file,
-            #             indent=4,
-            #         )

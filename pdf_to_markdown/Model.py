@@ -324,6 +324,21 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
         md_file.new_paragraph(paragraph_as_text)
 
 
+class BlockQuoteParagraph(Paragraph):
+    """A paragraph that originated from a markdown blockquote (> …)."""
+
+    def __init__(self, layout: PageLayout) -> None:
+        Paragraph.__init__(self, layout)
+
+    def to_markdown(self, md_file: MdUtils, dummy_level) -> None:
+        sentences = self.get_sublevels()
+        if not sentences:
+            Warning("Useless blockquote paragraph with no sentences.")
+            return
+        paragraph_as_text = " ".join([sentence.text for sentence in sentences])
+        md_file.new_paragraph("> " + paragraph_as_text)
+
+
 class TopLevelChapter:
     def __init__(self) -> None:
         # The original pages of the document constituting this chapter

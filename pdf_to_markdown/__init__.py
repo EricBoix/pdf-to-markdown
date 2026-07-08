@@ -1,6 +1,7 @@
 from .Model import (
     Sentence,
     Paragraph,
+    BlockQuoteParagraph,
     TopLevelChapterOfParagraphs,
     SubChapterOfParagraphs,
     SuperChapter,
@@ -32,3 +33,5 @@ from .Traces import (
     set_debug_mode,
 )
 from .WriteAsLangchainDocuments import WriteAsLangchainDocuments
+
+# from .MarkdownToDocument import MarkdownToDocument

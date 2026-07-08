@@ -12,6 +12,9 @@ dependencies = [
     "mdutils",
 ]
 
+[project.optional-dependencies]
+dev = ["black"]
+
 [tool.setuptools]
 packages = ["pdf_to_markdown"]
 

@@ -4,6 +4,15 @@
         "editor.formatOnSave": true
     },
     "cSpell.words": [
-        "pandoc"
-    ]
+        "blockquotes",
+        "fileutils",
+        "mdutils",
+        "nltk",
+        "pandoc",
+        "pypandoc",
+        "pypdf",
+        "setuptools"
+    ],
+    "python-envs.defaultEnvManager": "ms-python.python:venv",
+    "python-envs.workspaceSearchPaths": ["./**/venv", "./venv"],
 }

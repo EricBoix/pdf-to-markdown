@@ -37,8 +37,9 @@ class MarkdownToDocument:
     - Omitted sections: headers carrying the HTML comment _OMIT_MARKER (and
       all content beneath them) are silently skipped.
     """
+
     # Note: concerning the JSON AST delivered by pandoc, many thanks to
-    https://stackoverflow.com/questions/40945364/parsing-elements-from-a-markdown-file-in-python-3)
+    # https://stackoverflow.com/questions/40945364/parsing-elements-from-a-markdown-file-in-python-3)
 
     _DUMMY_LAYOUT = PageLayout(reader_page_number=0, page_number=0)
     _OMIT_MARKER = "<!-- omit from pdf-to-markdown:"

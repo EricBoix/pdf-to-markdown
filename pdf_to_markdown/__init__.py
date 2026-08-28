@@ -8,6 +8,7 @@ from .Model import (
     DocumentHierarchicalRoot,
     DocumentWithSubChapters,
     Document,
+    PublicationInfo,
 )
 from .ConverterBase import ConverterBase
 from .DocumentBuilder import DocumentBuilder

@@ -436,13 +436,23 @@ class SuperChapter(TopLevelChapter, DocumentHierarchicalLevel[SubChapterOfParagr
         return False
 
 
+class PublicationInfo:
+    """Publication metadata supplied by the doc-steward, separate from parsing rules."""
+
+    def __init__(self, doc_name: str, author: str | None = None, isbn: str | None = None) -> None:
+        self.doc_name = doc_name
+        self.author = author
+        self.isbn = isbn
+
+
 class DocumentHierarchicalRoot:
     """
     A list of Chapters.
     """
 
-    def __init__(self, title) -> None:
+    def __init__(self, title, publication_info: "PublicationInfo | None" = None) -> None:
         self.title = title
+        self.publication_info = publication_info
 
     def get_title(self) -> str:
         return self.title
@@ -475,8 +485,8 @@ class DocumentHierarchicalRoot:
 class Document(
     DocumentHierarchicalRoot, DocumentHierarchicalLevel[TopLevelChapterOfParagraphs]
 ):
-    def __init__(self, title: str) -> None:
-        DocumentHierarchicalRoot.__init__(self, title)
+    def __init__(self, title: str, publication_info: "PublicationInfo | None" = None) -> None:
+        DocumentHierarchicalRoot.__init__(self, title, publication_info)
         DocumentHierarchicalLevel.__init__(self, "Document")
 
     add_chapter = DocumentHierarchicalLevel.add_sublevel
@@ -486,8 +496,8 @@ class Document(
 class DocumentWithSubChapters(
     DocumentHierarchicalRoot, DocumentHierarchicalLevel[SuperChapter]
 ):
-    def __init__(self, title: str) -> None:
-        DocumentHierarchicalRoot.__init__(self, title)
+    def __init__(self, title: str, publication_info: "PublicationInfo | None" = None) -> None:
+        DocumentHierarchicalRoot.__init__(self, title, publication_info)
         DocumentHierarchicalLevel.__init__(self, "DocumentWithSubChapters")
 
     add_chapter = DocumentHierarchicalLevel.add_sublevel

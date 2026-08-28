@@ -10,12 +10,46 @@ from .Model import (
 # Warning: implicit dependency towards LangChain's Document class
 
 
+def _sentence_metadata(obj: Sentence) -> dict:
+    root = obj.hierarchical_toplevel
+    pub = root.publication_info if root else None
+
+    paragraph = obj.owning_hierarchical_level
+    level = paragraph.owning_hierarchical_level if paragraph else None
+
+    if isinstance(level, SubChapterOfParagraphs):
+        super_chapter = level.owning_hierarchical_level
+        chapter_name = super_chapter.name if super_chapter else None
+        chapter_number = super_chapter.number if super_chapter else None
+        subchapter_name = level.name
+        subchapter_number = level.number
+    else:
+        chapter_name = level.name if level else None
+        chapter_number = level.number if level else None
+        subchapter_name = None
+        subchapter_number = None
+
+    return {
+        "doc_name": pub.doc_name if pub else None,
+        "doc_title": root.title if root else None,
+        "author": pub.author if pub else None,
+        "isbn": pub.isbn if pub else None,
+        "chapter": chapter_name,
+        "chapter_number": chapter_number,
+        "subchapter": subchapter_name,
+        "subchapter_number": subchapter_number,
+        "paragraph_number": paragraph.number if paragraph else None,
+        "sentence_number": obj.number,
+        "page": obj.page_layout.reader_page_number if obj.page_layout else None,
+    }
+
+
 class LangChainDocumentEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, Sentence):
             return {
                 "__document__": True,
-                "metadata": {"source": obj.get_document_reference_long()},
+                "metadata": _sentence_metadata(obj),
                 "page_content": obj.text,
             }
         # Let the base class default method raise the TypeError
@@ -67,4 +101,3 @@ class WriteAsLangchainDocuments:
                 fp=output_json_file,
                 indent=4,
             )
-

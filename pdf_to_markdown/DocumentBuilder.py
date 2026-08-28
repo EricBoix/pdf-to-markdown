@@ -72,6 +72,14 @@ class DocumentBuilder(TextSanitizer, ABC):
             new_sentence_text = self.sanitize_newlines_and_multiple_whitespaces(
                 new_sentence_text
             )
+            # After normalizing typographic quotes, a sentence originally enclosed
+            # in single quotation marks may start or end with an ASCII apostrophe
+            # that is a quotation-mark artifact rather than part of the text.
+            # Strip those boundary characters: a genuine apostrophe (contraction
+            # or possessive) never begins or ends a complete sentence.
+            new_sentence_text = new_sentence_text.strip(
+                "'",  # ASCII APOSTROPHE — quotation-mark artifact at sentence boundary
+            )
             new_sentence = Sentence(new_sentence_text, new_sentence_layout)
             paragraph.add_sublevel(new_sentence)
             paragraph.renumber_sublevels()

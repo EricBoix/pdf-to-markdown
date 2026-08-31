@@ -23,8 +23,11 @@ class TextSanitizer:
             "‘",  # LEFT SINGLE QUOTATION MARK
             "",
         )
-        # U+2019 doubles as closing quotation mark and apostrophe:
-        # normalize to ASCII apostrophe to preserve contractions and possessives.
+        # U+2019 followed by whitespace is a closing quotation mark, not an apostrophe:
+        # remove it (the whitespace is preserved via lookahead).
+        text = re.sub("’(?=\\s)", "", text)
+        # U+2019 not followed by whitespace is an apostrophe in a contraction or possessive:
+        # normalize to ASCII apostrophe.
         text = text.replace(
             "’",  # RIGHT SINGLE QUOTATION MARK
             "'",       # ASCII APOSTROPHE (U+0027)

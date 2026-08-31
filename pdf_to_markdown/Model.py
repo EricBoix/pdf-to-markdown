@@ -126,6 +126,7 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
     """
 
     def __init__(self, name: str) -> None:
+        Numbered.__init__(self)
         Parent.__init__(self)
         self.name: str = name
         if not self.name:

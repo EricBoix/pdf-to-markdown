@@ -69,8 +69,8 @@ class DocumentBuilder(TextSanitizer, ABC):
                 continue
 
             new_sentence_layout = paragraph_layout.__copy__()
-            new_sentence_text = self.sanitize_newlines_and_multiple_whitespaces(
-                new_sentence_text
+            new_sentence_text = self._normalize_newlines_and_multiple_whitespaces(
+                self.sanitize_characters(new_sentence_text)
             )
             # After normalizing typographic quotes, a sentence originally enclosed
             # in single quotation marks may start or end with an ASCII apostrophe

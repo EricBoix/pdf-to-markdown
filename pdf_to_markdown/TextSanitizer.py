@@ -111,9 +111,29 @@ class TextSanitizer:
         return re.sub(r"\s+", " ", input_text).strip()
 
     @staticmethod
+    def _normalize_symbols(text: str) -> str:
+        """ASCII fold miscellaneous symbol characters.
+
+        U+263A WHITE SMILING FACE and U+F04A (private-use smiling face glyph
+        found in some PDF fonts) are both folded to the ASCII emoticon :-).
+        """
+        # fmt: off
+        text = text.replace(
+            "\u263a",  # U+263A WHITE SMILING FACE
+            ":-)",      # ASCII emoticon
+        )
+        text = text.replace(
+            "\uf04a",  # U+F04A private-use smiling face (PDF font glyph)
+            ":-)",      # ASCII emoticon
+        )
+        # fmt: on
+        return text
+
+    @staticmethod
     def sanitize_characters(input_text: str) -> str:
-        """ASCII-fold all known non-ASCII characters (quotes, diacritics, dashes)."""
+        """ASCII-fold all known non-ASCII characters (quotes, diacritics, dashes, symbols)."""
         input_text = TextSanitizer._normalize_typographic_quotes(input_text)
         input_text = TextSanitizer._normalize_diacritics(input_text)
         input_text = TextSanitizer._normalize_dashes(input_text)
+        input_text = TextSanitizer._normalize_symbols(input_text)
         return input_text

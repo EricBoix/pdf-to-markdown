@@ -6,23 +6,32 @@ class TextSanitizer:
 
     @staticmethod
     def _normalize_typographic_quotes(text: str) -> str:
-        """ASCII fold typographic (curly) single quote characters with ASCII '
-        character (refer to Jejune encoding notes).
+        """ASCII fold typographic (curly) quote (single and double) characters
+        (refer to Jejune encoding notes).
 
-        Both U+2018 (LEFT SINGLE QUOTATION MARK) and U+2019 (RIGHT SINGLE QUOTATION MARK) are replaced with the ASCII '.
-        Note: because U+2019 
+        Single quotes: U+2018 LEFT SINGLE QUOTATION MARK and U+2019 RIGHT SINGLE
+        QUOTATION MARK are folded to U+0027 ASCII APOSTROPHE.
+        Note: U+2019 serves distinct roles (closing quotation mark, contraction
+        apostrophe e.g. don’t, possessive e.g. monk’s); the folding is many-to-one.
+
+        Double quotes: U+201C LEFT DOUBLE QUOTATION MARK and U+201D RIGHT DOUBLE
+        QUOTATION MARK are folded to U+0022 ASCII QUOTATION MARK.
         """
-        # U+2018 is always an opening quotation mark
         text = text.replace(
             "‘",  # U+2018 LEFT SINGLE QUOTATION MARK
-            "'",  # U+0027 ASCII APOSTROPHE
+            "’",       # U+0027 ASCII APOSTROPHE
         )
-        # U+2019 serves distinct roles: closing quotation mark, an apostrophe
-        # within contractions (e.g. don't) and possessives (e.g. monk's). The
-        # the folding will thus be many to one.
         text = text.replace(
             "’",  # U+2019 RIGHT SINGLE QUOTATION MARK
-            "'",  # U+0027 ASCII APOSTROPHE
+            "’",       # U+0027 ASCII APOSTROPHE
+        )
+        text = text.replace(
+            "“",  # U+201C LEFT DOUBLE QUOTATION MARK
+            ‘"’,       # U+0022 ASCII QUOTATION MARK
+        )
+        text = text.replace(
+            "”",  # U+201D RIGHT DOUBLE QUOTATION MARK
+            ‘"’,       # U+0022 ASCII QUOTATION MARK
         )
         return text
 

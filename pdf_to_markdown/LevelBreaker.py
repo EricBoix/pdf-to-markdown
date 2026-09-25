@@ -95,7 +95,7 @@ class LevelBreaker:
         if not new_sublevel_name:
             return None, parts
         new_sublevel = self.sublevel_factory(new_layout)
-        new_sublevel.set_name(TextSanitizer.sanitize_characters(new_sublevel_name))
+        new_sublevel.set_name(TextSanitizer.normalize_chapter_name(new_sublevel_name))
         new_sublevel.append_text(parts[1])
         self.break_level(new_sublevel)
         self.level.add_sublevel(new_sublevel)

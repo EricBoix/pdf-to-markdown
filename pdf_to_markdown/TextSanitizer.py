@@ -130,6 +130,20 @@ class TextSanitizer:
         return text
 
     @staticmethod
+    def normalize_chapter_name(raw_name: str) -> str:
+        """Collapse newlines and ASCII-fold a raw chapter or sub-chapter name.
+
+        A newline flanked on both sides by an uppercase letter is a within-word
+        PDF renderer split (e.g. "GET\\nTING"); it is removed rather than
+        replaced with a space.  All other newlines denote line breaks between
+        words and are replaced with a space.  sanitize_characters() is then
+        applied to fold any remaining non-ASCII characters.
+        """
+        name = re.sub(r"([A-Z])\n([A-Z])", r"\1\2", raw_name)
+        name = name.replace("\n", " ")
+        return TextSanitizer.sanitize_characters(name)
+
+    @staticmethod
     def sanitize_characters(input_text: str) -> str:
         """ASCII-fold all known non-ASCII characters (quotes, diacritics, dashes, symbols)."""
         input_text = TextSanitizer._normalize_typographic_quotes(input_text)

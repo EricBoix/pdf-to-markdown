@@ -1,4 +1,3 @@
-import re
 from typing import Type
 
 from pypdf import PdfReader
@@ -131,11 +130,8 @@ class DocumentBreaker:
                         f"This looks like a new chapter yet it has no name.\nThis was the content of the extracted page: {new_extracted_page}"
                     )
 
-                # Chapter names must have newlines collapsed and all non-ASCII
-                # characters normalized:
-                sanitized_new_chapter_name = re.sub("\n", " ", new_chapter_name)
-                sanitized_new_chapter_name = TextSanitizer.sanitize_characters(
-                    sanitized_new_chapter_name
+                sanitized_new_chapter_name = TextSanitizer.normalize_chapter_name(
+                    new_chapter_name
                 )
                 current_chapter = ChapterDerived(sanitized_new_chapter_name)
                 self.document.add_chapter(current_chapter)

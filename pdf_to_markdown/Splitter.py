@@ -128,7 +128,7 @@ class Splitter:
         if match:
             # Deal with the multiline case
             sublevel_name = re.search(name_extraction_pattern, match.group(0)).group(0)
-            return re.sub("\n", " ", sublevel_name)
+            return sublevel_name
         Warning("Sublevel name not found.")
         return None
 

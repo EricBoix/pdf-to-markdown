@@ -78,11 +78,12 @@ class TextSanitizer:
 
     @staticmethod
     def _normalize_dashes(text: str) -> str:
-        """ASCII fold typographic dash characters.
+        """ASCII fold typographic dash and ellipsis characters.
 
         U+2014 EM DASH is folded to -- (two ASCII hyphens), the established
         plain-text convention for an em dash.
         U+2013 EN DASH is folded to - (one ASCII hyphen), used for numeric ranges.
+        U+2026 HORIZONTAL ELLIPSIS is folded to ... (three ASCII full stops).
         """
         # fmt: off
         text = text.replace(
@@ -92,6 +93,10 @@ class TextSanitizer:
         text = text.replace(
             "\u2013",  # U+2013 EN DASH
             "-",       # U+002D ASCII HYPHEN-MINUS
+        )
+        text = text.replace(
+            "\u2026",  # U+2026 HORIZONTAL ELLIPSIS
+            "...",     # three ASCII full stops
         )
         # fmt: on
         return text

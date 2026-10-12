@@ -31,34 +31,42 @@ SENTENCE_CHARACTER_EXAMPLES = [
 ]
 
 # Stage: sentence splitting (paragraph -> sentences)
-# Each entry: (paragraph_text, pre-sanitized NLTK output, expected final sentences).
-# The paragraph_text is used only for whole-paragraph-quote detection.
-# The pre-sanitized sentences are what DocumentBuilder produces after
-# sanitize_characters + _normalize_newlines_and_multiple_whitespaces per sentence.
+# split_paragraph_respecting_quotes is a passthrough: it returns its
+# sanitized_sentences argument unchanged. Each entry is therefore a pair
+# (paragraph_text, sanitized_sentences); the test asserts result == sanitized_sentences.
+# paragraph_text is included to document the full call context even though the
+# current implementation ignores it (it is part of the public API signature).
+#
+# Named codepoint constants used below to keep the intent visible without
+# relying on an editor that may silently convert literal quote characters.
+_apos = "\u0027"  # U+0027 ASCII APOSTROPHE
+_lsqm = "\u2018"  # U+2018 LEFT SINGLE QUOTATION MARK
+_rsqm = "\u2019"  # U+2019 RIGHT SINGLE QUOTATION MARK
 SENTENCE_SPLIT_EXAMPLES = [
-    # Multi-sentence quoted paragraph: each sentence gets re-wrapped in quotes.
+    # Multi-sentence paragraph enclosed in typographic single quotes.
+    # Boundary apostrophes on each fragment are meaningful quotation-mark pieces.
+    # Regression: quotes must not be stripped (old strip bug) nor re-wrapped
+    # with spurious extra apostrophes (old re-wrap bug).
     (
-        "'It is overfull. No more will go in!'",
-        ["'It is overfull.", "No more will go in!'"],
-        ["'It is overfull.'", "'No more will go in!'"],
+        _lsqm + "It is overfull. No more will go in!" + _rsqm,
+        [_apos + "It is overfull.", "No more will go in!" + _apos],
     ),
-    # Single-sentence quoted paragraph: quotes preserved as-is (no strip).
+    # Single-sentence paragraph enclosed in typographic single quotes.
     (
-        "'A single sentence.'",
-        ["'A single sentence.'"],
+        "‘A single sentence.’",
         ["'A single sentence.'"],
     ),
-    # Unquoted paragraph: boundary apostrophes stripped (existing behavior).
+    # Unquoted paragraph: no apostrophes anywhere.
     (
         "Normal paragraph. Second sentence.",
         ["Normal paragraph.", "Second sentence."],
-        ["Normal paragraph.", "Second sentence."],
     ),
-    # Unquoted paragraph with stray boundary apostrophe artifact.
+    # Mixed: quoted dialogue, attribution sentence, second quoted sentence.
+    # Regression for spurious apostrophe injection: the attribution sentence
+    # "Nan-in said." must NOT gain a trailing apostrophe.
     (
-        "The monk said: it is good.",
-        ["'The monk said:", "it is good.'"],
-        ["The monk said:", "it is good."],
+        "‘Like this cup,’ Nan-in said. ‘You are full of your own opinions.’",
+        ["'Like this cup,' Nan-in said.", "'You are full of your own opinions.'"],
     ),
 ]
 # fmt: on

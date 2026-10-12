@@ -161,25 +161,17 @@ class TextSanitizer:
     def split_paragraph_respecting_quotes(
         paragraph_text: str, sanitized_sentences: list[str]
     ) -> list[str]:
-        """Apply boundary-apostrophe handling aware of whole-paragraph quoting.
+        """Pass sanitized sentences through unchanged.
 
-        After ASCII-folding, a sentence from a quoted multi-sentence paragraph
-        has a stray opening or closing apostrophe at its boundary. Rather than
-        stripping that artifact (which loses the quoting information), each
-        sentence is re-wrapped in apostrophes when the whole paragraph was
-        quoted and was split into more than one sentence.
-
-        For single-sentence quoted paragraphs the quotes are preserved as-is.
-        For unquoted paragraphs the existing boundary-apostrophe strip applies:
-        a genuine apostrophe (contraction or possessive) never begins or ends
-        a complete sentence.
+        Earlier versions stripped or re-wrapped boundary ASCII apostrophes to
+        remove "artifacts" introduced by ASCII-folding typographic single quotes
+        before sentence splitting. Both approaches were incorrect: a boundary
+        apostrophe is a meaningful fragment of the original quotation (e.g. the
+        opening quote of 'It is overfull. or the closing quote of No more will
+        go in!') and must not be altered. Stripping loses the quote character;
+        re-wrapping injects spurious apostrophes into attribution sentences such
+        as 'Like this cup,' Nan-in said. -> 'Like this cup,' Nan-in said.'
+        The correct behaviour is to return the sentences exactly as produced by
+        the sanitizer and sentence tokenizer.
         """
-        folded = TextSanitizer.sanitize_characters(paragraph_text)
-        if folded.startswith("'") and folded.endswith("'"):
-            if len(sanitized_sentences) > 1:
-                return [
-                    "'" + sentence.strip("'") + "'" for sentence in sanitized_sentences
-                ]
-            # Single-sentence quoted paragraph: keep quotes intact.
-            return sanitized_sentences
-        return [sentence.strip("'") for sentence in sanitized_sentences]
+        return sanitized_sentences

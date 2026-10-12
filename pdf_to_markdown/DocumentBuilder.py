@@ -71,14 +71,10 @@ class DocumentBuilder(TextSanitizer, ABC):
             for sentence in tokenized_text
             if sentence
         ]
-        # After normalizing typographic quotes, a sentence originally enclosed
-        # in single quotation marks may start or end with an ASCII apostrophe
-        # that is a quotation-mark artifact rather than part of the text.
-        # When the whole paragraph was quoted and splits into multiple sentences,
-        # each sentence is re-wrapped in apostrophes to preserve the quoting
-        # context. For single-sentence quoted paragraphs, quotes are kept intact.
-        # For unquoted paragraphs, boundary apostrophes are stripped: a genuine
-        # apostrophe (contraction or possessive) never begins or ends a sentence.
+        # Boundary apostrophes from sentence splitting are preserved as-is.
+        # They are meaningful fragments of the original quotation and must not
+        # be stripped or re-injected. See TextSanitizer.split_paragraph_respecting_quotes
+        # for the full rationale.
         final_sentences = TextSanitizer.split_paragraph_respecting_quotes(
             paragraph_text, sanitized_sentences
         )

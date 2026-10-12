@@ -14,6 +14,17 @@ pip install git+https://github.com/EricBoix/pdf-to-markdown.git
 from pdf_to_markdown import ConverterBase, DocumentBuilder, TextExtractor
 ```
 
+## Package testing
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+pytest
+```
+
+Add `--cov=pdf_to_markdown --cov-report=term-missing` for a coverage report.
+
 ## Converting a new PDF
 
 Extracting structure from PDFs requires inferring regex patterns for chapters, sub-chapters, figures, etc.

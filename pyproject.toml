@@ -15,10 +15,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["black"]
+dev = ["black", "pytest>=8.0", "pytest-cov", "fpdf2"]
 
 [tool.setuptools]
 packages = ["pdf_to_markdown"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.black]
 line-length = 88

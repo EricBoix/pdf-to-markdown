@@ -1,0 +1,15 @@
+ananda
+ānanda
+metta
+ṃetta
+# Technical
+blockquotes
+pytest
+venv
+fileutils
+mdutils
+nltk
+pandoc
+pypandoc
+pypdf
+setuptools

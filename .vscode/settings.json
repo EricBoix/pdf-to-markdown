@@ -3,16 +3,15 @@
         "editor.defaultFormatter": "ms-python.black-formatter",
         "editor.formatOnSave": true
     },
-    "cSpell.words": [
-        "blockquotes",
-        "fileutils",
-        "mdutils",
-        "nltk",
-        "pandoc",
-        "pypandoc",
-        "pypdf",
-        "setuptools"
-    ],
+    "cSpell.customDictionaries": {
+        "pdf-to-markdown-words": {
+            "name": "pdf_to_markdown",
+            "path": "${workspaceRoot}/pdf_to_markdown-words.txt",
+            "description": "Words used for pdf-to-markdown python package",
+            "addWords": true
+        },
+        "pdf_to_markdown": true
+    },
     "python-envs.defaultEnvManager": "ms-python.python:venv",
     "python-envs.workspaceSearchPaths": ["./**/venv", "./venv"],
 }

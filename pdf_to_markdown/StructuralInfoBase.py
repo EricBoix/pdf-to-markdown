@@ -127,14 +127,17 @@ class StructuralInfoBase(ABC):
         typo_and_fix = self.get_typo_and_fix(page_number)
         if typo_and_fix is None:
             return
-        typo = typo_and_fix[self.KEY_TYPO]
-        if not re.search(typo, extracted_page.text):
-            Warning(f"Couldn't find typo in extracted page number {page_number}:")
-            Warning(f"  - typo: {typo}")
-            Warning(f"  - page text: {extracted_page.text}")
-            return
-        extracted_page.text = re.sub(typo, typo_and_fix[self.KEY_FIX], extracted_page.text)
-        Debug(f"Typo fixed on page {page_number}")
+        # Accept either a single fix dict or a list of fix dicts.
+        fixes = typo_and_fix if isinstance(typo_and_fix, list) else [typo_and_fix]
+        for fix_entry in fixes:
+            typo = fix_entry[self.KEY_TYPO]
+            if not re.search(typo, extracted_page.text):
+                Warning(f"Couldn't find typo in extracted page number {page_number}:")
+                Warning(f"  - typo: {typo}")
+                Warning(f"  - page text: {extracted_page.text}")
+                continue
+            extracted_page.text = re.sub(typo, fix_entry[self.KEY_FIX], extracted_page.text)
+            Debug(f"Typo fixed on page {page_number}")
 
     def _get_page_number_finishing_last_paragraph(self, page_number):
         """

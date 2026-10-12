@@ -156,3 +156,30 @@ class TextSanitizer:
         input_text = TextSanitizer._normalize_dashes(input_text)
         input_text = TextSanitizer._normalize_symbols(input_text)
         return input_text
+
+    @staticmethod
+    def split_paragraph_respecting_quotes(
+        paragraph_text: str, sanitized_sentences: list[str]
+    ) -> list[str]:
+        """Apply boundary-apostrophe handling aware of whole-paragraph quoting.
+
+        After ASCII-folding, a sentence from a quoted multi-sentence paragraph
+        has a stray opening or closing apostrophe at its boundary. Rather than
+        stripping that artifact (which loses the quoting information), each
+        sentence is re-wrapped in apostrophes when the whole paragraph was
+        quoted and was split into more than one sentence.
+
+        For single-sentence quoted paragraphs the quotes are preserved as-is.
+        For unquoted paragraphs the existing boundary-apostrophe strip applies:
+        a genuine apostrophe (contraction or possessive) never begins or ends
+        a complete sentence.
+        """
+        folded = TextSanitizer.sanitize_characters(paragraph_text)
+        if folded.startswith("'") and folded.endswith("'"):
+            if len(sanitized_sentences) > 1:
+                return [
+                    "'" + sentence.strip("'") + "'" for sentence in sanitized_sentences
+                ]
+            # Single-sentence quoted paragraph: keep quotes intact.
+            return sanitized_sentences
+        return [sentence.strip("'") for sentence in sanitized_sentences]

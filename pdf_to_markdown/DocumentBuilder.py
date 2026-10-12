@@ -64,22 +64,28 @@ class DocumentBuilder(TextSanitizer, ABC):
             )
         paragraph_text = paragraph.text
         tokenized_text = nltk.tokenize.sent_tokenize(paragraph_text)
-        for new_sentence_text in tokenized_text:
+        sanitized_sentences = [
+            self._normalize_newlines_and_multiple_whitespaces(
+                self.sanitize_characters(sentence)
+            )
+            for sentence in tokenized_text
+            if sentence
+        ]
+        # After normalizing typographic quotes, a sentence originally enclosed
+        # in single quotation marks may start or end with an ASCII apostrophe
+        # that is a quotation-mark artifact rather than part of the text.
+        # When the whole paragraph was quoted and splits into multiple sentences,
+        # each sentence is re-wrapped in apostrophes to preserve the quoting
+        # context. For single-sentence quoted paragraphs, quotes are kept intact.
+        # For unquoted paragraphs, boundary apostrophes are stripped: a genuine
+        # apostrophe (contraction or possessive) never begins or ends a sentence.
+        final_sentences = TextSanitizer.split_paragraph_respecting_quotes(
+            paragraph_text, sanitized_sentences
+        )
+        for new_sentence_text in final_sentences:
             if not new_sentence_text:
                 continue
-
             new_sentence_layout = paragraph_layout.__copy__()
-            new_sentence_text = self._normalize_newlines_and_multiple_whitespaces(
-                self.sanitize_characters(new_sentence_text)
-            )
-            # After normalizing typographic quotes, a sentence originally enclosed
-            # in single quotation marks may start or end with an ASCII apostrophe
-            # that is a quotation-mark artifact rather than part of the text.
-            # Strip those boundary characters: a genuine apostrophe (contraction
-            # or possessive) never begins or ends a complete sentence.
-            new_sentence_text = new_sentence_text.strip(
-                "'",  # ASCII APOSTROPHE — quotation-mark artifact at sentence boundary
-            )
             new_sentence = Sentence(new_sentence_text, new_sentence_layout)
             paragraph.add_sublevel(new_sentence)
             paragraph.renumber_sublevels()

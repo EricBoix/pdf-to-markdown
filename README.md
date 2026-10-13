@@ -17,8 +17,8 @@ from pdf_to_markdown import ConverterBase, DocumentBuilder, TextExtractor
 ## Package testing
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv venv
+source venv/bin/activate
 pip install -e ".[dev]"
 pytest
 ```

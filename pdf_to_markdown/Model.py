@@ -1,6 +1,6 @@
 from __future__ import annotations  # Allow forward references in type hints
 from abc import ABC
-from typing import Generic, List, Optional, TypeVar, TYPE_CHECKING
+from typing import Generic, TypeVar, TYPE_CHECKING
 import re
 import nltk
 from mdutils.mdutils import MdUtils
@@ -16,7 +16,6 @@ for resource, path in [
         nltk.download(resource, quiet=True)
 from .PageLayout import PageLayout
 from .Warning import Warning, WarnAndExit
-
 
 if TYPE_CHECKING:
     from typing import Protocol
@@ -34,10 +33,10 @@ class Numbered:
         # Numbering of this hierarchical level is the position within the
         # container of the owning hierarchical level. Note that this numbering
         # is for human consumption and thus starts at 1, not 0.
-        self._number: Optional[int] = None
+        self._number: int | None = None
 
     @property
-    def number(self) -> Optional[int]:
+    def number(self) -> int | None:
         return self._number
 
     def set_number(self, number: int) -> None:
@@ -54,11 +53,11 @@ class Parent:
         self._owning_hierarchical_level = parent
 
     @property
-    def owning_hierarchical_level(self) -> Optional[DocumentHierarchicalLevel]:
+    def owning_hierarchical_level(self) -> DocumentHierarchicalLevel | None:
         return self._owning_hierarchical_level
 
     @property
-    def hierarchical_toplevel(self) -> Optional[DocumentHierarchicalLevel]:
+    def hierarchical_toplevel(self) -> DocumentHierarchicalLevel | None:
         level = self
         while level.owning_hierarchical_level:
             level = level.owning_hierarchical_level
@@ -80,7 +79,7 @@ class Sentence(Numbered, Parent):
         """
         self.text += " " + other.text
 
-    def is_complete(self):
+    def is_complete(self) -> bool:
         # The problem is hard, refer e.g. to
         # https://stackoverflow.com/questions/71590785/nlp-check-if-a-detected-sentence-is-a-complete-sentence
         # We check:
@@ -138,12 +137,12 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         # intermediate level titles (e.g. chapter title)
         self.text: str = None
         # The optional sub-hierarchical levels of this one
-        self.sublevels: Optional[List[T]] = None
+        self.sublevels: list[T] | None = None
         # The page where this Hierarchical level is encountered within the
         # original document
-        self.page_layout: Optional[PageLayout] = None
+        self.page_layout: PageLayout | None = None
 
-    def get_text_with_layout(self):
+    def get_text_with_layout(self) -> list:
         # Used to get some (artificial) genericity with DocumentHierarchicalRoot
         # where the original document text is stored in pages that have both
         # a text and a layout_page attribute.
@@ -162,7 +161,7 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
             )
         return self.sublevels[index]
 
-    def get_last_sublevel(self):
+    def get_last_sublevel(self) -> T | None:
         if not self.sublevels:
             Warning("No sublevels found.")
             return None
@@ -177,7 +176,7 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         else:
             raise ValueError("Sublevel not found.")
 
-    def get_sublevels(self):
+    def get_sublevels(self) -> list[T] | None:
         return self.sublevels
 
     def set_name(self, name: str) -> None:
@@ -194,10 +193,10 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
             for index, sublevel in enumerate(self.sublevels, start=1):
                 sublevel.set_number(index)
 
-    def has_page_number(self, page_number):
+    def has_page_number(self, page_number) -> bool:
         return self.page_layout.page_number == page_number
 
-    def get_first_sublevel_of_given_page(self, page_number):
+    def get_first_sublevel_of_given_page(self, page_number) -> T | None:
         for sublevel in self.sublevels:
             if sublevel.page_layout.page_number == page_number:
                 return sublevel
@@ -206,7 +205,7 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         )
         return None
 
-    def get_last_sublevel_of_given_page(self, page_number):
+    def get_last_sublevel_of_given_page(self, page_number) -> T | None:
         sublevel_of_that_page = None
         for sublevel in self.sublevels:
             if sublevel.page_layout.page_number == page_number:
@@ -343,14 +342,14 @@ class BlockQuoteParagraph(Paragraph):
 class TopLevelChapter:
     def __init__(self) -> None:
         # The original pages of the document constituting this chapter
-        self.pages: List[str] = list()
+        self.pages: list[str] = list()
 
     def add_page(self, page) -> None:
         if not self.pages:
             self.page_layout = page.page_layout
         self.pages.append(page)
 
-    def get_text_with_layout(self):
+    def get_text_with_layout(self) -> list:
         return self.pages
 
 
@@ -363,7 +362,7 @@ class TopLevelChapterOfParagraphs(
         DocumentHierarchicalLevel.__init__(self, name)
         TopLevelChapter.__init__(self)
 
-    def get_text_with_layout(self):
+    def get_text_with_layout(self) -> list:
         return self.pages
 
     def get_document_reference_long(self) -> str:
@@ -393,7 +392,7 @@ class SubChapterOfParagraphs(DocumentHierarchicalLevel[Paragraph]):
     def __init__(self, name: str) -> None:
         DocumentHierarchicalLevel.__init__(self, name)
 
-    def get_text_with_layout(self):
+    def get_text_with_layout(self) -> list:
         return [self]
 
     def get_document_reference_long(self) -> str:
@@ -427,7 +426,7 @@ class SuperChapter(TopLevelChapter, DocumentHierarchicalLevel[SubChapterOfParagr
     get_chapters = DocumentHierarchicalLevel.get_sublevels
     renumber_chapters = DocumentHierarchicalLevel.renumber_sublevels
 
-    def is_SuperChapterOfParagraph(self):
+    def is_SuperChapterOfParagraph(self) -> bool:
         if not self.get_sublevels():
             # We can not really decide.
             return False
@@ -440,7 +439,9 @@ class SuperChapter(TopLevelChapter, DocumentHierarchicalLevel[SubChapterOfParagr
 class PublicationInfo:
     """Publication metadata supplied by the doc-steward, separate from parsing rules."""
 
-    def __init__(self, doc_name: str, author: str | None = None, isbn: str | None = None) -> None:
+    def __init__(
+        self, doc_name: str, author: str | None = None, isbn: str | None = None
+    ) -> None:
         self.doc_name = doc_name
         self.author = author
         self.isbn = isbn
@@ -451,7 +452,9 @@ class DocumentHierarchicalRoot:
     A list of Chapters.
     """
 
-    def __init__(self, title, publication_info: "PublicationInfo | None" = None) -> None:
+    def __init__(
+        self, title, publication_info: "PublicationInfo | None" = None
+    ) -> None:
         self.title = title
         self.publication_info = publication_info
 
@@ -486,7 +489,9 @@ class DocumentHierarchicalRoot:
 class Document(
     DocumentHierarchicalRoot, DocumentHierarchicalLevel[TopLevelChapterOfParagraphs]
 ):
-    def __init__(self, title: str, publication_info: "PublicationInfo | None" = None) -> None:
+    def __init__(
+        self, title: str, publication_info: "PublicationInfo | None" = None
+    ) -> None:
         DocumentHierarchicalRoot.__init__(self, title, publication_info)
         DocumentHierarchicalLevel.__init__(self, "Document")
 
@@ -497,7 +502,9 @@ class Document(
 class DocumentWithSubChapters(
     DocumentHierarchicalRoot, DocumentHierarchicalLevel[SuperChapter]
 ):
-    def __init__(self, title: str, publication_info: "PublicationInfo | None" = None) -> None:
+    def __init__(
+        self, title: str, publication_info: "PublicationInfo | None" = None
+    ) -> None:
         DocumentHierarchicalRoot.__init__(self, title, publication_info)
         DocumentHierarchicalLevel.__init__(self, "DocumentWithSubChapters")
 

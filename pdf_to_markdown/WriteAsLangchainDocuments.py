@@ -45,7 +45,7 @@ def _sentence_metadata(obj: Sentence) -> dict:
 
 
 class LangChainDocumentEncoder(json.JSONEncoder):
-    def default(self, obj):
+    def default(self, obj) -> dict:
         if isinstance(obj, Sentence):
             return {
                 "__document__": True,
@@ -62,10 +62,10 @@ class WriteAsLangchainDocuments:
     References: https://reference.langchain.com/python/langchain-core/documents/base/Document
     """
 
-    def __init__(self, document):
+    def __init__(self, document) -> None:
         self._document = document
 
-    def _collect_level_sentences(self, level, output_json_file):
+    def _collect_level_sentences(self, level, output_json_file) -> list[Sentence]:
         collected_sentences = []
         for sublevel in level.get_sublevels():
             if isinstance(sublevel, Paragraph):
@@ -88,7 +88,7 @@ class WriteAsLangchainDocuments:
                 sys.exit()
         return collected_sentences
 
-    def write_sentences(self, output_json_filename):
+    def write_sentences(self, output_json_filename) -> None:
         with open(output_json_filename, "w+") as output_json_file:
             collected_sentences = []
             for chapter in self._document.get_chapters():

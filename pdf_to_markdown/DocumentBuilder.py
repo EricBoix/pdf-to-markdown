@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Protocol
+from typing import Protocol
 
 import nltk
 
@@ -87,7 +87,7 @@ class DocumentBuilder(TextSanitizer, ABC):
             paragraph.renumber_sublevels()
 
     def break_any_level_chapter_into_paragraphs(
-        self, chapter, contents: Optional[List[ContentWithLayout]] = None
+        self, chapter, contents: list[ContentWithLayout] | None = None
     ) -> None:
         """The chapter argument can be of any level e.g. a SuperChapter or a ChapterOfParagraphs..."""
         breaker = LevelBreaker(

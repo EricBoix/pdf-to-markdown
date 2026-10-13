@@ -19,10 +19,10 @@ class ExtractedPage:
         self.original_pdf_page = original_page
         self.text = None
 
-    def set_text(self, text_in):
+    def set_text(self, text_in) -> None:
         self.text = text_in
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             "Extracted paragraph id: " + repr(id(self)) + "\n"
             "Python page number: " + str(self.page_number) + "\n"

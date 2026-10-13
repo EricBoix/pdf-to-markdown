@@ -7,7 +7,7 @@ class PageLayout:
         at all (e.g. the cover or back-cover or some illustrative pages).
     """
 
-    def __init__(self, reader_page_number, page_number):
+    def __init__(self, reader_page_number, page_number) -> None:
         self._reader_page_number = reader_page_number
         if isinstance(reader_page_number, int):
             self._page_number = page_number
@@ -15,7 +15,7 @@ class PageLayout:
             self._page_number = int(page_number)
         self._reference_text = "DUMMY UNDEFINED VALUE"
 
-    def __copy__(self):
+    def __copy__(self) -> "PageLayout":
         cls = self.__class__
         result = cls.__new__(cls)
         result._reader_page_number = self._reader_page_number
@@ -24,9 +24,9 @@ class PageLayout:
         return result
 
     @property
-    def reader_page_number(self):
+    def reader_page_number(self) -> int | str:
         return self._reader_page_number
 
     @property
-    def page_number(self):
+    def page_number(self) -> int:
         return self._page_number

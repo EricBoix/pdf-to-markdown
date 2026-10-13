@@ -45,7 +45,7 @@ class StructuralInfoBase(ABC):
         """Return total number of pages in the PDF document."""
         ...
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Technical (optimisation) variable used to hold the correspondance
         # between a given page number and the chapter to which that page
         # belongs to. In other terms, within this dictionary
@@ -63,7 +63,9 @@ class StructuralInfoBase(ABC):
             self._chapter_splitter_instance = self.chapter_splitter(self)
         return self._chapter_splitter_instance
 
-    def set_chapter_page_number(self, page_number: int, chapter_page_number: int):
+    def set_chapter_page_number(
+        self, page_number: int, chapter_page_number: int
+    ) -> None:
         """Set the chapter page number of the page designated by page number.
 
         :param int page_number: The page number of the page for which we are setting the chapter (page)
@@ -75,37 +77,37 @@ class StructuralInfoBase(ABC):
             )
         self._chapter_page[page_number] = chapter_page_number
 
-    def _page_is_dropped(self, page_number):
+    def _page_is_dropped(self, page_number) -> bool:
         if not page_number in self.pages_info:
             return False
         if not self.KEY_DROP_PAGE in self.pages_info[page_number]:
             return False
         return True
 
-    def _page_is_skipped(self, page_number):
+    def _page_is_skipped(self, page_number) -> bool:
         """
         The derived classes might overload this definition with their specific considerations.
         """
         return self._page_is_dropped(page_number)
 
-    def _get_chapter_page_number(self, page_number):
+    def _get_chapter_page_number(self, page_number) -> int:
         if page_number not in self._chapter_page:
             WarnAndExit(f"Unknown chapter page of page number {page_number}.")
         return self._chapter_page[page_number]
 
-    def _get_chapter_page(self, page_number):
+    def _get_chapter_page(self, page_number) -> dict:
         chapter_page_number = self._get_chapter_page_number(page_number)
         return self.pages_info[chapter_page_number]
 
-    def _get_chapter_info(self, page_number):
+    def _get_chapter_info(self, page_number) -> dict:
         chapter_page = self._get_chapter_page(page_number)
         return chapter_page[self.KEY_CHAPTER_INFO]
 
-    def _get_chapter_name(self, page_number):
+    def _get_chapter_name(self, page_number) -> str | None:
         chapter_info = self._get_chapter_info(page_number)
         return chapter_info.get(self.KEY_NAME)
 
-    def _holds_new_chapter(self, page_number):
+    def _holds_new_chapter(self, page_number) -> bool:
         if not page_number in self.pages_info:
             return False
         if not self.KEY_TYPE in self.pages_info[page_number]:
@@ -114,14 +116,14 @@ class StructuralInfoBase(ABC):
             return True
         return False
 
-    def get_typo_and_fix(self, page_number):
+    def get_typo_and_fix(self, page_number) -> dict | list | None:
         if not page_number in self.pages_info:
             return None
         if not self.KEY_TYPO_AND_FIX in self.pages_info[page_number]:
             return None
         return self.pages_info[page_number][self.KEY_TYPO_AND_FIX]
 
-    def fix_typos(self, extracted_page):
+    def fix_typos(self, extracted_page) -> None:
         """Apply typo fixes on extracted pages that require it."""
         page_number = extracted_page.page_number
         typo_and_fix = self.get_typo_and_fix(page_number)
@@ -136,10 +138,12 @@ class StructuralInfoBase(ABC):
                 Warning(f"  - typo: {typo}")
                 Warning(f"  - page text: {extracted_page.text}")
                 continue
-            extracted_page.text = re.sub(typo, fix_entry[self.KEY_FIX], extracted_page.text)
+            extracted_page.text = re.sub(
+                typo, fix_entry[self.KEY_FIX], extracted_page.text
+            )
             Debug(f"Typo fixed on page {page_number}")
 
-    def _get_page_number_finishing_last_paragraph(self, page_number):
+    def _get_page_number_finishing_last_paragraph(self, page_number) -> int:
         """
         A page that is followed by one (or many) skipped pages will need to skip such pages in order to retrieve the end of its last paragraph.
         Return the page number of the first page that holds the content of the end of the paragraph.
@@ -149,7 +153,7 @@ class StructuralInfoBase(ABC):
             next_page_number += 1
         return next_page_number
 
-    def convert_to_logical_page_number(self, page_number):
+    def convert_to_logical_page_number(self, page_number) -> str:
         """
         Some pdf books (generally also available in paper form) propose an
         ad-hoc page numbering scheme (think e.g. of roman numbering based page numbers or starting the numbering after the pages holding the editor's
@@ -165,6 +169,6 @@ class StructuralInfoBase(ABC):
         """
         return str(page_number)
 
-    def sanitize_page_text(self, extracted_page):
+    def sanitize_page_text(self, extracted_page) -> None:
         """Sanitize page text. Override in derived classes for book-specific sanitization."""
         pass

@@ -4,7 +4,7 @@ class TextExtractor:
     This separates the text extraction concern from DocumentBreaker.
     """
 
-    def __init__(self, reader, structural_info):
+    def __init__(self, reader, structural_info) -> None:
         self.reader = reader
         self.structural_info = structural_info
 

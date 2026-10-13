@@ -1,5 +1,3 @@
-from typing import Type
-
 from .Model import TopLevelChapter
 from .Warning import WarnAndExit
 from .DocumentBuilder import DocumentBuilder
@@ -15,7 +13,7 @@ class ConverterBase(DocumentBuilder):
     chapter, sub-chapter, paragraph...).
     """
 
-    def __init__(self, pdf_filename, document, structural_info):
+    def __init__(self, pdf_filename, document, structural_info) -> None:
         self.pdf_filename = pdf_filename
         DocumentBuilder.__init__(self, document, structural_info)
         self.build_document()
@@ -36,8 +34,8 @@ class ConverterBase(DocumentBuilder):
 
     def break_document_into_chapters(
         self,
-        ChapterDerived: Type[TopLevelChapter] = None,
-    ):
+        ChapterDerived: type[TopLevelChapter] = None,
+    ) -> None:
         document_breaker = DocumentBreaker(
             self.pdf_filename,
             self.document,

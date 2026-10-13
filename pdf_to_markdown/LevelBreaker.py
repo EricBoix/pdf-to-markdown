@@ -1,4 +1,4 @@
-from typing import Callable, List, Optional, Protocol, Tuple
+from typing import Callable, Protocol
 
 from .Model import (
     DocumentHierarchicalLevel,
@@ -14,8 +14,8 @@ from .Traces import Debug
 class Splitter(Protocol):
     """Protocol for level splitters."""
 
-    def split(self, content_text: str) -> List[str]: ...
-    def get_sublevel_name(self, content_text: str) -> Optional[str]: ...
+    def split(self, content_text: str) -> list[str]: ...
+    def get_sublevel_name(self, content_text: str) -> str | None: ...
 
 
 class ContentWithLayout(Protocol):
@@ -35,12 +35,12 @@ class LevelBreaker:
         self,
         level: DocumentHierarchicalLevel,
         level_splitter: Splitter,
-        sublevel_factory: Callable[[Optional[PageLayout]], DocumentHierarchicalLevel],
+        sublevel_factory: Callable[[PageLayout | None], DocumentHierarchicalLevel],
         break_level_callback: Callable[[DocumentHierarchicalLevel], None],
         break_paragraphs_callback: Callable[
-            [DocumentHierarchicalLevel, Optional[List[ContentWithLayout]]], None
+            [DocumentHierarchicalLevel, list[ContentWithLayout] | None], None
         ],
-    ):
+    ) -> None:
         self.level = level
         self.level_splitter = level_splitter
         self.sublevel_factory = sublevel_factory
@@ -48,7 +48,7 @@ class LevelBreaker:
         self.break_paragraphs = break_paragraphs_callback
 
     def break_into_sublevels(
-        self, contents: Optional[List[ContentWithLayout]] = None
+        self, contents: list[ContentWithLayout] | None = None
     ) -> None:
         """Break a hierarchical level into sublevels using the provided splitter."""
         Debug(f"########### break_into_sublevels, level: {self.level}")
@@ -85,8 +85,8 @@ class LevelBreaker:
                     break
 
     def _try_create_sublevel(
-        self, new_layout: PageLayout, parts: List[str]
-    ) -> Tuple[Optional[DocumentHierarchicalLevel], List[str]]:
+        self, new_layout: PageLayout, parts: list[str]
+    ) -> tuple[DocumentHierarchicalLevel | None, list[str]]:
         """Try to create a sublevel from parts[0] (name) and parts[1] (content).
         Returns (new_sublevel, remaining_parts) tuple."""
         if len(parts) < 2:
@@ -105,8 +105,8 @@ class LevelBreaker:
         self,
         new_layout: PageLayout,
         current_level: DocumentHierarchicalLevel,
-        parts: List[str],
-    ) -> Tuple[bool, List[str]]:
+        parts: list[str],
+    ) -> tuple[bool, list[str]]:
         """Handle text that cannot be broken into sublevels.
         Returns (should_break, remaining_parts) tuple."""
         new_sublevel_type = type(self.sublevel_factory(None))

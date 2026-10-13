@@ -1,5 +1,3 @@
-from typing import Type
-
 from pypdf import PdfReader
 
 from .ExtractedPage import ExtractedPage
@@ -21,7 +19,7 @@ class DocumentBreaker:
         pdf_filename,
         document,
         structural_info,
-    ):
+    ) -> None:
         self.document = document
         self.structural_info = structural_info
         self.chapter_splitter = structural_info.get_chapter_splitter()
@@ -34,7 +32,7 @@ class DocumentBreaker:
         text_extractor = TextExtractor(self.reader, structural_info)
         self.extracted_texts = text_extractor.extract_all()
 
-    def _validate_all_pages(self):
+    def _validate_all_pages(self) -> None:
         """Perform all upfront page validation."""
         if len(self.reader.pages) != self.structural_info.total_page_number:
             WarnAndExit(
@@ -44,12 +42,12 @@ class DocumentBreaker:
         for page_number in range(self.structural_info.total_page_number):
             self._validate_page(page_number)
 
-    def _validate_page(self, page_number):
+    def _validate_page(self, page_number) -> None:
         """Validate a single page."""
         self._validate_reader_page_coherence(page_number)
         self._validate_page_structure(page_number)
 
-    def _validate_reader_page_coherence(self, page_number):
+    def _validate_reader_page_coherence(self, page_number) -> None:
         """Validate reader page number matches expected."""
         original_reader_page = self.reader.pages[page_number]
         original_reader_page_number = self.reader.get_page_number(original_reader_page)
@@ -60,7 +58,7 @@ class DocumentBreaker:
                 f"   - pypdf::reader page number: {original_reader_page_number}"
             )
 
-    def _validate_page_structure(self, page_number):
+    def _validate_page_structure(self, page_number) -> None:
         """Validate page has required structural info."""
         pages_info = self.structural_info.pages_info
         if page_number not in pages_info:
@@ -79,8 +77,8 @@ class DocumentBreaker:
 
     def break_document_into_chapters(
         self,
-        ChapterDerived: Type[TopLevelChapter] = None,
-    ):
+        ChapterDerived: type[TopLevelChapter] = None,
+    ) -> None:
         current_chapter = None
         for page_number in range(0, self.structural_info.total_page_number):
 

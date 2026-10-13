@@ -11,7 +11,7 @@ from .Warning import Warning, WarnAndExit
 class ParagraphMerger:
     """Handles merging of paragraphs that span across page boundaries."""
 
-    def __init__(self, structural_info):
+    def __init__(self, structural_info) -> None:
         self.structural_info = structural_info
 
     def _page_requires_paragraph_continuation(self, page_number: int) -> bool:
@@ -21,9 +21,13 @@ class ParagraphMerger:
             return False
         return True
 
-    def _chapter_get_first_paragraph_of_given_page(self, chapter, page_number: int):
+    def _chapter_get_first_paragraph_of_given_page(
+        self, chapter, page_number: int
+    ) -> Paragraph | None:
         for sublevel in chapter.get_sublevels():
-            if isinstance(sublevel, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)):
+            if isinstance(
+                sublevel, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)
+            ):
                 sublevel_result = self._chapter_get_first_paragraph_of_given_page(
                     sublevel, page_number
                 )
@@ -38,10 +42,14 @@ class ParagraphMerger:
         Warning(f"Paragraph of {chapter} with page number {page_number} not found.")
         return None
 
-    def _chapter_get_last_paragraph_of_given_page(self, chapter, page_number: int):
+    def _chapter_get_last_paragraph_of_given_page(
+        self, chapter, page_number: int
+    ) -> Paragraph | None:
         sublevel_of_that_page = None
         for sublevel in chapter.get_sublevels():
-            if isinstance(sublevel, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)):
+            if isinstance(
+                sublevel, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)
+            ):
                 result = self._chapter_get_last_paragraph_of_given_page(
                     sublevel, page_number
                 )
@@ -55,7 +63,9 @@ class ParagraphMerger:
                     sublevel_of_that_page = sublevel
         return sublevel_of_that_page
 
-    def reconstitute_paragraphs_spreading_over_two_pages(self, top_level_chapter):
+    def reconstitute_paragraphs_spreading_over_two_pages(
+        self, top_level_chapter
+    ) -> None:
         """Merge paragraphs that were split across page boundaries.
 
         When a page ends with an unfinished Paragraph then the next page begins

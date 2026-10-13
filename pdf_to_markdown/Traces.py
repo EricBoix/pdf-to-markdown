@@ -10,12 +10,12 @@ from .Model import (
 _debug_mode = False
 
 
-def set_debug_mode(enabled: bool):
+def set_debug_mode(enabled: bool) -> None:
     global _debug_mode
     _debug_mode = enabled
 
 
-def Debug(message: str):
+def Debug(message: str) -> None:
     if _debug_mode:
         print(message)
 
@@ -23,7 +23,7 @@ def Debug(message: str):
 # A set of debugging utilities.
 
 
-def print_document_raw_pages(pdf_filename):
+def print_document_raw_pages(pdf_filename) -> None:
     """
     Print the pages of the document.
     """
@@ -47,10 +47,10 @@ def print_document_raw_pages(pdf_filename):
 
 
 class PrintDocument:
-    def __init__(self, document):
+    def __init__(self, document) -> None:
         self._document = document
 
-    def pages(self):
+    def pages(self) -> None:
         print("##########################################################")
         print("##########################################################")
         print("############ DOCUMENT AS SET OF PAGES ####################")
@@ -65,7 +65,7 @@ class PrintDocument:
                 print(repr(page))
                 print("")
 
-    def paragraphs(self):
+    def paragraphs(self) -> None:
         print("##########################################################")
         print("##########################################################")
         print("############ DOCUMENT AS SET OF PARAGRAPHS ###############")
@@ -84,7 +84,7 @@ class PrintDocument:
                     "\n",
                 )
 
-    def sentences(self):
+    def sentences(self) -> None:
         print("##########################################################")
         print("##########################################################")
         print("##### DOCUMENT AS SET OF SENTENCES WITHIN PARAGRAPHS #####")
@@ -93,7 +93,7 @@ class PrintDocument:
         for chapter in self._document.get_chapters():
             self._print_chapter(chapter)
 
-    def with_subchapter_sentences(self):
+    def with_subchapter_sentences(self) -> None:
         print("##########################################################")
         print("##########################################################")
         print("############### DOCUMENT DOWN TO THE SENTENCES ###########")
@@ -111,14 +111,14 @@ class PrintDocument:
                 elif isinstance(sublevel, Paragraph):
                     self._print_paragraph_and_sentences(sublevel)
 
-    def _print_chapter(self, chapter):
+    def _print_chapter(self, chapter) -> None:
         if isinstance(chapter, SuperChapter):
             self._print_super_chapter(chapter)
             return
         if isinstance(chapter, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)):
             self._print_chapter_of_paragraphs(chapter)
 
-    def _print_super_chapter(self, super_chapter):
+    def _print_super_chapter(self, super_chapter) -> None:
         if not isinstance(super_chapter, SuperChapter):
             print("Chapter ", super_chapter.name, "is not a SuperChapter.")
             print("Exiting.")
@@ -139,7 +139,7 @@ class PrintDocument:
             print("Exiting.")
             sys.exit()
 
-    def _print_chapter_of_paragraphs(self, chapter):
+    def _print_chapter_of_paragraphs(self, chapter) -> None:
         if not isinstance(
             chapter, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)
         ):
@@ -152,7 +152,7 @@ class PrintDocument:
         for paragraph in chapter.get_sublevels():
             self._print_paragraph_and_sentences(paragraph)
 
-    def _print_paragraph_and_sentences(self, paragraph):
+    def _print_paragraph_and_sentences(self, paragraph) -> None:
         print("###", paragraph.get_document_reference_long())
         sentences = paragraph.get_sentences()
         if not sentences:

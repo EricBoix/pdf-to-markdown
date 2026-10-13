@@ -2,8 +2,8 @@
 
 Two distinct contexts live here:
   - Character sanitization: folding of non-ASCII chars in sentence text.
-  - Sentence splitting: boundary apostrophes are preserved as-is
-    (TextSanitizer.split_paragraph_respecting_quotes is a passthrough).
+  - Sentence splitting: boundary apostrophes are re-wrapped when unbalanced
+    (TextSanitizer.split_paragraph_respecting_quotes, odd-count rule).
 
 Examples for each context are imported from fixtures/text_examples.py to
 prevent accidental cross-stage mixing.
@@ -34,12 +34,17 @@ class TestCharacterSanitization:
 class TestSentenceSplitting:
     """TextSanitizer.split_paragraph_respecting_quotes."""
 
-    @pytest.mark.parametrize("paragraph_text,sanitized_sentences", SENTENCE_SPLIT_EXAMPLES)
-    def test_split_paragraph_is_passthrough(self, paragraph_text, sanitized_sentences):
+    @pytest.mark.parametrize(
+        "paragraph_text,sanitized_sentences,expected_sentences",
+        SENTENCE_SPLIT_EXAMPLES,
+    )
+    def test_split_paragraph_rewraps_unbalanced_quotes(
+        self, paragraph_text, sanitized_sentences, expected_sentences
+    ):
         result = TextSanitizer.split_paragraph_respecting_quotes(
             paragraph_text, sanitized_sentences
         )
-        assert result == sanitized_sentences
+        assert result == expected_sentences
 
     def test_empty_sentence_list_returns_empty(self):
         result = TextSanitizer.split_paragraph_respecting_quotes("Any text.", [])

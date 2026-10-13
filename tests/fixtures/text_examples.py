@@ -31,11 +31,18 @@ SENTENCE_CHARACTER_EXAMPLES = [
 ]
 
 # Stage: sentence splitting (paragraph -> sentences)
-# split_paragraph_respecting_quotes is a passthrough: it returns its
-# sanitized_sentences argument unchanged. Each entry is therefore a pair
-# (paragraph_text, sanitized_sentences); the test asserts result == sanitized_sentences.
-# paragraph_text is included to document the full call context even though the
-# current implementation ignores it (it is part of the public API signature).
+# split_paragraph_respecting_quotes re-wraps sentence fragments that have an
+# unbalanced boundary apostrophe. 
+# Each entry of SENTENCE_SPLIT_EXAMPLES is a triple:
+#   (paragraph_text, sanitized_sentences_in, expected_sentences_out)
+# 
+# sanitized_sentences_in is what NLTK tokenisation + sanitize_characters
+# produces; expected_sentences_out is what split_paragraph_respecting_quotes
+# must return.  The triple shape is required because the input and output are
+# not identical: split_paragraph_respecting_quotes completes fragments that
+# carry an unbalanced boundary apostrophe (a side-effect of NLTK splitting a
+# singly-quoted paragraph), so a two-element (input, expected) pair is the
+# minimum faithful representation of this transformation.
 #
 # Named codepoint constants used below to keep the intent visible without
 # relying on an editor that may silently convert literal quote characters.
@@ -44,28 +51,35 @@ _lsqm = "\u2018"  # U+2018 LEFT SINGLE QUOTATION MARK
 _rsqm = "\u2019"  # U+2019 RIGHT SINGLE QUOTATION MARK
 SENTENCE_SPLIT_EXAMPLES = [
     # Multi-sentence paragraph enclosed in typographic single quotes.
-    # Boundary apostrophes on each fragment are meaningful quotation-mark pieces.
-    # Regression: quotes must not be stripped (old strip bug) nor re-wrapped
-    # with spurious extra apostrophes (old re-wrap bug).
+    # NLTK attaches the opening quote to the first fragment and the closing
+    # quote to the last. split_paragraph_respecting_quotes completes each
+    # fragment with the missing paired apostrophe (odd-count rule).
     (
         _lsqm + "It is overfull. No more will go in!" + _rsqm,
         [_apos + "It is overfull.", "No more will go in!" + _apos],
+        [_apos + "It is overfull." + _apos, _apos + "No more will go in!" + _apos],
     ),
     # Single-sentence paragraph enclosed in typographic single quotes.
+    # The sentence already has balanced apostrophes (even count): no change.
     (
-        "‘A single sentence.’",
+        "'A single sentence.'",
+        ["'A single sentence.'"],
         ["'A single sentence.'"],
     ),
-    # Unquoted paragraph: no apostrophes anywhere.
+    # Unquoted paragraph: no apostrophes anywhere; no change.
     (
         "Normal paragraph. Second sentence.",
         ["Normal paragraph.", "Second sentence."],
+        ["Normal paragraph.", "Second sentence."],
     ),
-    # Mixed: quoted dialogue, attribution sentence, second quoted sentence.
-    # Regression for spurious apostrophe injection: the attribution sentence
-    # "Nan-in said." must NOT gain a trailing apostrophe.
+    # Mixed: quoted dialogue followed by attribution and a second quotation.
+    # The attribution fragment "'Like this cup,' Nan-in said." has an even
+    # apostrophe count (the pair 'Like...,' is balanced), so no apostrophe is
+    # injected -- avoiding the spurious-apostrophe bug in earlier re-wrap
+    # attempts.
     (
-        "‘Like this cup,’ Nan-in said. ‘You are full of your own opinions.’",
+        "'Like this cup,' Nan-in said. 'You are full of your own opinions.'",
+        ["'Like this cup,' Nan-in said.", "'You are full of your own opinions.'"],
         ["'Like this cup,' Nan-in said.", "'You are full of your own opinions.'"],
     ),
 ]

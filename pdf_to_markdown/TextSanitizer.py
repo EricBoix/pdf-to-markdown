@@ -158,20 +158,40 @@ class TextSanitizer:
         return input_text
 
     @staticmethod
+    def _rewrap_sentence_if_unbalanced(sentence: str) -> str:
+        """Add the missing boundary apostrophe to a sentence fragment with an odd count.
+
+        When NLTK splits a singly-quoted paragraph the opening quote stays on the
+        first fragment and the closing quote stays on the last. An odd apostrophe
+        count combined with a boundary position identifies such a fragment; the
+        missing paired quote is appended or prepended accordingly.
+        """
+        quote_count = sentence.count("'")
+        if quote_count % 2 == 1:
+            if sentence.startswith("'"):
+                return sentence + "'"
+            if sentence.endswith("'"):
+                return "'" + sentence
+        return sentence
+
+    @staticmethod
     def split_paragraph_respecting_quotes(
         paragraph_text: str, sanitized_sentences: list[str]
     ) -> list[str]:
-        """Pass sanitized sentences through unchanged.
+        """Re-wrap sentence fragments that have unbalanced boundary apostrophes.
 
-        Earlier versions stripped or re-wrapped boundary ASCII apostrophes to
-        remove "artifacts" introduced by ASCII-folding typographic single quotes
-        before sentence splitting. Both approaches were incorrect: a boundary
-        apostrophe is a meaningful fragment of the original quotation (e.g. the
-        opening quote of 'It is overfull. or the closing quote of No more will
-        go in!') and must not be altered. Stripping loses the quote character;
-        re-wrapping injects spurious apostrophes into attribution sentences such
-        as 'Like this cup,' Nan-in said. -> 'Like this cup,' Nan-in said.'
-        The correct behaviour is to return the sentences exactly as produced by
-        the sanitizer and sentence tokenizer.
+        When NLTK splits a singly-quoted paragraph (e.g. 'It is overfull. No more
+        will go in!'), the opening quote attaches to the first fragment and the
+        closing quote attaches to the last. Each fragment is completed by adding
+        the missing boundary apostrophe when it has an odd apostrophe count and
+        starts or ends with one.
+
+        Fragments whose apostrophes are already balanced (e.g. attribution
+        sentences like 'Like this cup,' Nan-in said.) are returned unchanged,
+        avoiding the spurious-apostrophe injection seen in earlier re-wrap
+        attempts.
         """
-        return sanitized_sentences
+        return [
+            TextSanitizer._rewrap_sentence_if_unbalanced(sentence)
+            for sentence in sanitized_sentences
+        ]

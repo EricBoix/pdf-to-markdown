@@ -176,6 +176,14 @@ class TextSanitizer:
         A word-terminal ' that has an inner-sentence word-initial partner
         (a ' preceded by whitespace or punctuation, like 'homeless in
         'homeless monk') is considered balanced and does not trigger framing.
+
+        When no inner-sentence partner exists, the sentence-opening ' at
+        position 0 is also treated as a valid partner when the tail text after
+        the word-terminal ' spans at least two words, which is characteristic
+        of an attribution phrase (e.g. "'You are dead all right' observed the
+        teacher."). A single-word tail (e.g. "cat." in "'John saw James' cat.")
+        cannot be attribution, so the word-terminal ' remains ambiguous and
+        triggers framing.
         """
         if not sentence.startswith("'"):
             return False
@@ -189,6 +197,7 @@ class TextSanitizer:
         ]
         return any(
             not any(init < terminal for init in inner_initials)
+            and len(sentence[terminal + 1 :].split()) < 2
             for terminal in word_terminals
         )
 

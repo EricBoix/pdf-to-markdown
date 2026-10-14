@@ -111,6 +111,22 @@ SENTENCE_SPLIT_EXAMPLES = [
         [_apos + "It wasn't so.", "He didn't care." + _apos],
         [_apos + "It wasn't so.", "He didn't care." + _apos],
     ),
+    # Dialogue attribution: the closing ' of 'You are dead all right' is a
+    # word-terminal apostrophe after a common word (right). The attribution
+    # tail 'observed the teacher.' has two words, distinguishing it from a
+    # single-word possessive tail like "cat." — neither fragment is framed.
+    # Source: Paul Reps, Zen Flesh Zen Bones (1957).
+    (
+        "'You are dead all right' observed the teacher. 'But how about that sound?'",
+        [
+            "'You are dead all right' observed the teacher.",
+            "'But how about that sound?'",
+        ],
+        [
+            "'You are dead all right' observed the teacher.",
+            "'But how about that sound?'",
+        ],
+    ),
 ]
 
 _ms = TextSanitizer._MISMATCH_START
@@ -124,5 +140,14 @@ SENTENCE_ERRONEOUS_QUOTES_EXAMPLES = [
         "'John saw James' cat.",
         _ms + "'John saw James' cat." + _me,
     ),
+]
+
+# Sentences where the word-terminal ' closes a direct-speech quote opened
+# at position 0; the attribution tail has >= 2 words, so the sentence passes
+# through _frame_sentence_if_unbalanced unchanged.
+SENTENCE_ATTRIBUTION_BOUNDARY_EXAMPLES = [
+    # Exactly two attribution words ('he explained.') — the minimum tail
+    # length that signals attribution rather than a single possessed noun.
+    "'Everything in this life is impermanent' he explained.",
 ]
 # fmt: on

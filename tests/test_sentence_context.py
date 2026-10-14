@@ -14,6 +14,7 @@ import pytest
 from pdf_to_markdown import TextSanitizer
 
 from .fixtures.text_examples import (
+    SENTENCE_ATTRIBUTION_BOUNDARY_EXAMPLES,
     SENTENCE_CHARACTER_EXAMPLES,
     SENTENCE_ERRONEOUS_QUOTES_EXAMPLES,
     SENTENCE_SPLIT_EXAMPLES,
@@ -62,3 +63,7 @@ class TestErroneousQuotes:
     def test_unbalanced_sentence_is_framed(self, sentence, expected):
         result = TextSanitizer._frame_sentence_if_unbalanced(sentence)
         assert result == expected
+
+    @pytest.mark.parametrize("sentence", SENTENCE_ATTRIBUTION_BOUNDARY_EXAMPLES)
+    def test_attribution_sentence_boundary_apostrophe_is_correct(self, sentence):
+        assert TextSanitizer._frame_sentence_if_unbalanced(sentence) == sentence

@@ -44,13 +44,11 @@ def test_chapter_one_paragraph_splits_into_two_sentences(fixture_document):
     assert len(sentences) == 2
 
 
-def test_chapter_one_sentences_are_re_quoted(fixture_document):
-    # The original paragraph "'It is overfull. No more will go in!'" must
-    # produce two sentences each wrapped in quotes.
+def test_chapter_one_sentences_boundary_apostrophes_unchanged(fixture_document):
     chapters = fixture_document.get_chapters()
     sentences = chapters[0].get_sublevels()[0].get_sentences()
-    assert sentences[0].text == "'It is overfull.'"
-    assert sentences[1].text == "'No more will go in!'"
+    assert sentences[0].text == "'It is overfull."
+    assert sentences[1].text == "No more will go in!'"
 
 
 def test_chapter_two_has_one_sentence(fixture_document):

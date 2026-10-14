@@ -1,3 +1,5 @@
+from pdf_to_markdown import TextSanitizer
+
 # fmt: off
 # All non-ASCII input characters are written as explicit Unicode escapes to
 # prevent any editor or tool from silently converting them.
@@ -31,56 +33,82 @@ SENTENCE_CHARACTER_EXAMPLES = [
 ]
 
 # Stage: sentence splitting (paragraph -> sentences)
-# split_paragraph_respecting_quotes re-wraps sentence fragments that have an
-# unbalanced boundary apostrophe. 
+# split_paragraph_respecting_quotes passes each sentence through unchanged.
 # Each entry of SENTENCE_SPLIT_EXAMPLES is a triple:
 #   (paragraph_text, sanitized_sentences_in, expected_sentences_out)
-# 
-# sanitized_sentences_in is what NLTK tokenisation + sanitize_characters
-# produces; expected_sentences_out is what split_paragraph_respecting_quotes
-# must return.  The triple shape is required because the input and output are
-# not identical: split_paragraph_respecting_quotes completes fragments that
-# carry an unbalanced boundary apostrophe (a side-effect of NLTK splitting a
-# singly-quoted paragraph), so a two-element (input, expected) pair is the
-# minimum faithful representation of this transformation.
+#  where
+#    - paragraph_text: the original document text;
+#    - sanitized_sentences_in: what NLTK tokenisation + sanitize_characters
+#      produces; 
+#    - expected_sentences_out: what split_paragraph_respecting_quotes
+#      must return.  
+# The triple shape is kept so that the test makes the passthrough contract
+# explicit: 
+#    expected_sentences_out == sanitized_sentences_in
+# for every entry in this list.
 #
 # Named codepoint constants used below to keep the intent visible without
 # relying on an editor that may silently convert literal quote characters.
 _apos = "\u0027"  # U+0027 ASCII APOSTROPHE
 _lsqm = "\u2018"  # U+2018 LEFT SINGLE QUOTATION MARK
 _rsqm = "\u2019"  # U+2019 RIGHT SINGLE QUOTATION MARK
+# All entries below are valid source text; split_paragraph_respecting_quotes
+# passes them through unchanged.
 SENTENCE_SPLIT_EXAMPLES = [
     # Multi-sentence paragraph enclosed in typographic single quotes.
-    # NLTK attaches the opening quote to the first fragment and the closing
-    # quote to the last. split_paragraph_respecting_quotes completes each
-    # fragment with the missing paired apostrophe (odd-count rule).
     (
         _lsqm + "It is overfull. No more will go in!" + _rsqm,
         [_apos + "It is overfull.", "No more will go in!" + _apos],
-        [_apos + "It is overfull." + _apos, _apos + "No more will go in!" + _apos],
+        [_apos + "It is overfull.", "No more will go in!" + _apos],
     ),
     # Single-sentence paragraph enclosed in typographic single quotes.
-    # The sentence already has balanced apostrophes (even count): no change.
     (
         "'A single sentence.'",
         ["'A single sentence.'"],
         ["'A single sentence.'"],
     ),
-    # Unquoted paragraph: no apostrophes anywhere; no change.
+    # Unquoted paragraph.
     (
         "Normal paragraph. Second sentence.",
         ["Normal paragraph.", "Second sentence."],
         ["Normal paragraph.", "Second sentence."],
     ),
-    # Mixed: quoted dialogue followed by attribution and a second quotation.
-    # The attribution fragment "'Like this cup,' Nan-in said." has an even
-    # apostrophe count (the pair 'Like...,' is balanced), so no apostrophe is
-    # injected -- avoiding the spurious-apostrophe bug in earlier re-wrap
-    # attempts.
+    # Quoted dialogue followed by attribution and a second quotation.
     (
         "'Like this cup,' Nan-in said. 'You are full of your own opinions.'",
         ["'Like this cup,' Nan-in said.", "'You are full of your own opinions.'"],
         ["'Like this cup,' Nan-in said.", "'You are full of your own opinions.'"],
+    ),
+    # Attribution sentence whose inner speech contains a possessive.
+    (
+        "He said: 'Ananda's path.'",
+        ["He said: 'Ananda's path.'"],
+        ["He said: 'Ananda's path.'"],
+    ),
+    # Singly-quoted paragraph where the first fragment contains a possessive.
+    (
+        _lsqm + "The monk's bowl was empty. Nothing remained." + _rsqm,
+        [_apos + "The monk's bowl was empty.", "Nothing remained." + _apos],
+        [_apos + "The monk's bowl was empty.", "Nothing remained." + _apos],
+    ),
+    # Singly-quoted paragraph where each fragment contains a contraction.
+    (
+        _lsqm + "It wasn't so. He didn't care." + _rsqm,
+        [_apos + "It wasn't so.", "He didn't care." + _apos],
+        [_apos + "It wasn't so.", "He didn't care." + _apos],
+    ),
+]
+
+_ms = TextSanitizer._MISMATCH_START
+_me = TextSanitizer._MISMATCH_END
+SENTENCE_ERRONEOUS_QUOTES_EXAMPLES = [
+    # Fragment starting with ' that contains no inner closing quote in the
+    # [!?.,]' sense.  pdf_to_markdown cannot determine whether the word-
+    # terminal apostrophe (James' before a space) is a possessive or a
+    # closing quotation mark, so it frames the fragment.
+    (
+        "'John saw James' cat.",
+        _ms + "'John saw James' cat." + _me,
     ),
 ]
 # fmt: on

@@ -157,41 +157,56 @@ class TextSanitizer:
         input_text = TextSanitizer._normalize_symbols(input_text)
         return input_text
 
-    @staticmethod
-    def _rewrap_sentence_if_unbalanced(sentence: str) -> str:
-        """Add the missing boundary apostrophe to a sentence fragment with an odd count.
+    _MISMATCH_START = "<<PDF_TO_MARKDOWN DETECTED MISSMATCH: START>>"
+    _MISMATCH_END = "<<PDF_TO_MARKDOWN DETECTED MISSMATCH: END>>"
 
-        When NLTK splits a singly-quoted paragraph the opening quote stays on the
-        first fragment and the closing quote stays on the last. An odd apostrophe
-        count combined with a boundary position identifies such a fragment; the
-        missing paired quote is appended or prepended accordingly.
+    @staticmethod
+    def _has_word_terminal_apostrophe(sentence: str) -> bool:
+        """True if sentence contains a ' at the end of a word (letter before, space after).
+
+        Example: James' in "'John saw James' cat." — the apostrophe could be a
+        possessive or a closing quotation mark.  That ambiguity cannot be resolved
+        automatically, so the sentence must be flagged rather than silently altered.
+
+        Possessives like monk's or contractions like don't have ' before a letter,
+        not before a space, and therefore do not match.
         """
-        quote_count = sentence.count("'")
-        if quote_count % 2 == 1:
-            if sentence.startswith("'"):
-                return sentence + "'"
-            if sentence.endswith("'"):
-                return "'" + sentence
+        return bool(re.search(r"(?<=[A-Za-z])'(?=\s)", sentence))
+
+    @staticmethod
+    def _frame_sentence_if_unbalanced(sentence: str) -> str:
+        """Frame a sentence that contains a word-terminal apostrophe.
+
+        A word-terminal apostrophe (letter before, space after) is genuinely
+        ambiguous: it could be a possessive or a closing quotation mark.  Rather
+        than guessing, the sentence is wrapped in mismatch markers so the problem
+        is visible in the final output.
+
+        All other sentences — including NLTK-split fragments whose boundary ' has
+        no matching partner — are returned unchanged.
+        """
+        if TextSanitizer._has_word_terminal_apostrophe(sentence):
+            return (
+                TextSanitizer._MISMATCH_START + sentence + TextSanitizer._MISMATCH_END
+            )
         return sentence
 
     @staticmethod
     def split_paragraph_respecting_quotes(
         paragraph_text: str, sanitized_sentences: list[str]
     ) -> list[str]:
-        """Re-wrap sentence fragments that have unbalanced boundary apostrophes.
+        """Pass sentences through, framing any that contain a word-terminal apostrophe.
 
-        When NLTK splits a singly-quoted paragraph (e.g. 'It is overfull. No more
-        will go in!'), the opening quote attaches to the first fragment and the
-        closing quote attaches to the last. Each fragment is completed by adding
-        the missing boundary apostrophe when it has an odd apostrophe count and
-        starts or ends with one.
+        NLTK-split fragments from singly-quoted paragraphs (e.g. 'It is overfull.
+        or No more will go in!') are returned unchanged — their boundary apostrophes
+        are unambiguous artifacts of the split and do not need correction.
 
-        Fragments whose apostrophes are already balanced (e.g. attribution
-        sentences like 'Like this cup,' Nan-in said.) are returned unchanged,
-        avoiding the spurious-apostrophe injection seen in earlier re-wrap
-        attempts.
+        Sentences with a word-terminal apostrophe (letter before, space after, e.g.
+        James' in "'John saw James' cat.") are wrapped in mismatch markers because
+        it is impossible to tell automatically whether the apostrophe is possessive
+        or a closing quotation mark.
         """
         return [
-            TextSanitizer._rewrap_sentence_if_unbalanced(sentence)
+            TextSanitizer._frame_sentence_if_unbalanced(sentence)
             for sentence in sanitized_sentences
         ]

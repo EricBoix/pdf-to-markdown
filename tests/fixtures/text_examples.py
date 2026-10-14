@@ -85,6 +85,20 @@ SENTENCE_SPLIT_EXAMPLES = [
         ["He said: 'Ananda's path.'"],
         ["He said: 'Ananda's path.'"],
     ),
+    # Sentences containing an inner balanced quotation ('homeless monk').
+    # The word-terminal ' after monk is matched by the inner ' before homeless.
+    # The second variant adds a leading contraction (I'm) which must not affect
+    # the result: the sentence does not start with ' so no ambiguity arises.
+    (
+        "I am grateful to Nyogen Senzaki, 'homeless monk' exemplar-friend.",
+        ["I am grateful to Nyogen Senzaki, 'homeless monk' exemplar-friend."],
+        ["I am grateful to Nyogen Senzaki, 'homeless monk' exemplar-friend."],
+    ),
+    (
+        "I'm grateful to Nyogen Senzaki, 'homeless monk' exemplar-friend.",
+        ["I'm grateful to Nyogen Senzaki, 'homeless monk' exemplar-friend."],
+        ["I'm grateful to Nyogen Senzaki, 'homeless monk' exemplar-friend."],
+    ),
     # Singly-quoted paragraph where the first fragment contains a possessive.
     (
         _lsqm + "The monk's bowl was empty. Nothing remained." + _rsqm,

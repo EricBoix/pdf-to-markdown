@@ -162,16 +162,35 @@ class TextSanitizer:
 
     @staticmethod
     def _has_word_terminal_apostrophe(sentence: str) -> bool:
-        """True if sentence contains a ' at the end of a word (letter before, space after).
+        """True when the sentence starts with ' and has an unmatched word-terminal apostrophe.
 
-        Example: James' in "'John saw James' cat." — the apostrophe could be a
-        possessive or a closing quotation mark.  That ambiguity cannot be resolved
-        automatically, so the sentence must be flagged rather than silently altered.
+        A word-terminal apostrophe (letter before, space after) creates genuine
+        ambiguity only when the sentence itself starts with ': that opening '
+        might be a paragraph-opening quote, making it unclear whether the
+        word-terminal ' later in the sentence closes it or is simply possessive.
 
-        Possessives like monk's or contractions like don't have ' before a letter,
-        not before a space, and therefore do not match.
+        If the sentence does not start with ', a word-terminal ' can only be
+        possessive (e.g. James' in an attribution sentence), so no ambiguity
+        arises and the function returns False.
+
+        A word-terminal ' that has an inner-sentence word-initial partner
+        (a ' preceded by whitespace or punctuation, like 'homeless in
+        'homeless monk') is considered balanced and does not trigger framing.
         """
-        return bool(re.search(r"(?<=[A-Za-z])'(?=\s)", sentence))
+        if not sentence.startswith("'"):
+            return False
+        word_terminals = [
+            m.start() for m in re.finditer(r"(?<=[A-Za-z])'(?=\s)", sentence)
+        ]
+        if not word_terminals:
+            return False
+        inner_initials = [
+            m.start() for m in re.finditer(r"(?<=[\s,;:])'(?=[A-Za-z])", sentence)
+        ]
+        return any(
+            not any(init < terminal for init in inner_initials)
+            for terminal in word_terminals
+        )
 
     @staticmethod
     def _frame_sentence_if_unbalanced(sentence: str) -> str:

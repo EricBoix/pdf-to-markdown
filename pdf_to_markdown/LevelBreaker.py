@@ -113,6 +113,9 @@ class LevelBreaker:
         remaining = parts[1:]
 
         if new_sublevel_type == Paragraph:
+            if not parts[0].strip():
+                Warning("Skipping paragraph with empty text.")
+                return False, remaining
             new_paragraph = Paragraph(new_layout)
             new_paragraph.append_text(parts[0])
             self.break_level(new_paragraph)

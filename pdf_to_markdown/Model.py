@@ -1,6 +1,6 @@
 from __future__ import annotations  # Allow forward references in type hints
 from abc import ABC
-from typing import Generic, TypeVar, TYPE_CHECKING
+from typing import Generic, TypeVar
 import re
 import nltk
 from mdutils.mdutils import MdUtils
@@ -18,13 +18,6 @@ import warnings
 
 from .Errors import ConverterError
 from .PageLayout import PageLayout
-
-if TYPE_CHECKING:
-    from typing import Protocol
-
-    class HasToMarkdown(Protocol):
-        def to_markdown(self, md_file: MdUtils) -> None: ...
-
 
 # Type variable for sublevel types in DocumentHierarchicalLevel
 T = TypeVar("T", bound="DocumentHierarchicalLevel | None")
@@ -249,7 +242,9 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
                 )
                 return
         if self.owning_hierarchical_level is None:
-            raise ConverterError("DocumentHierarchicalLevel has no owning hierarchical level.")
+            raise ConverterError(
+                "DocumentHierarchicalLevel has no owning hierarchical level."
+            )
         self.sublevels.extend(other.sublevels)
         self.owning_hierarchical_level.remove_sublevel(other)
         self.owning_hierarchical_level.renumber_sublevels()

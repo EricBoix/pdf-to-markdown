@@ -1,24 +1,11 @@
-import sys
 import pypdf
+from .Errors import ConverterError
 from .Model import (
     TopLevelChapterOfParagraphs,
     SubChapterOfParagraphs,
     SuperChapter,
     Paragraph,
 )
-
-_debug_mode = False
-
-
-def set_debug_mode(enabled: bool) -> None:
-    global _debug_mode
-    _debug_mode = enabled
-
-
-def Debug(message: str) -> None:
-    if _debug_mode:
-        print(message)
-
 
 # A set of debugging utilities.
 
@@ -120,9 +107,9 @@ class PrintDocument:
 
     def _print_super_chapter(self, super_chapter) -> None:
         if not isinstance(super_chapter, SuperChapter):
-            print("Chapter ", super_chapter.name, "is not a SuperChapter.")
-            print("Exiting.")
-            sys.exit()
+            raise ConverterError(
+                f"Chapter {super_chapter.name} is not a SuperChapter."
+            )
         print("###################################################################")
         print("################## Super Chapter name: ", super_chapter.name)
         print("###################################################################")
@@ -135,17 +122,17 @@ class PrintDocument:
             if isinstance(sublevel, Paragraph):
                 self._print_paragraph_and_sentences(sublevel)
                 continue
-            print("Chapter ", super_chapter.name, "is of unknown type.")
-            print("Exiting.")
-            sys.exit()
+            raise ConverterError(
+                f"Chapter {super_chapter.name} sublevel is of unknown type."
+            )
 
     def _print_chapter_of_paragraphs(self, chapter) -> None:
         if not isinstance(
             chapter, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)
         ):
-            print("Chapter ", chapter.name, "is not a ChapterOfParagraphs.")
-            print("Exiting.")
-            sys.exit()
+            raise ConverterError(
+                f"Chapter {chapter.name} is not a ChapterOfParagraphs."
+            )
         print("###################################################################")
         print("################## Chapter name: ", chapter.name)
         print("###################################################################")

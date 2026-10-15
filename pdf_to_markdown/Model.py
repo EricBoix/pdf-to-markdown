@@ -313,7 +313,6 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
         """
         sentences = self.get_sublevels()
         if not sentences:
-            print("FIXME FIXME FIXME FIXME FIXME")
             Warning("Useless paragraph with no sentences.")
             Warning("Optimisation inquiry required.")
             return

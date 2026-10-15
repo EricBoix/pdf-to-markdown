@@ -1,4 +1,3 @@
-from __future__ import annotations  # Allow forward references in type hints
 from abc import ABC
 from typing import Generic, TypeVar
 import re
@@ -48,11 +47,11 @@ class Parent:
         self._owning_hierarchical_level = parent
 
     @property
-    def owning_hierarchical_level(self) -> DocumentHierarchicalLevel | None:
+    def owning_hierarchical_level(self) -> "DocumentHierarchicalLevel | None":
         return self._owning_hierarchical_level
 
     @property
-    def hierarchical_toplevel(self) -> DocumentHierarchicalLevel | None:
+    def hierarchical_toplevel(self) -> "DocumentHierarchicalLevel | None":
         level = self
         while level.owning_hierarchical_level:
             level = level.owning_hierarchical_level
@@ -68,7 +67,7 @@ class Sentence(Numbered, Parent):
         self.text = text
         self.page_layout = layout.__copy__()
 
-    def append(self, other: Sentence) -> None:
+    def append(self, other: "Sentence") -> None:
         """
         Append text to the current sentence.
         """
@@ -211,7 +210,7 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
             )
         return sublevel_of_that_page
 
-    def merge(self, other: DocumentHierarchicalLevel) -> None:
+    def merge(self, other: "DocumentHierarchicalLevel") -> None:
         """
         Concatenate another DocumentHierarchicalLevel to this one and dispose
         of the other. This method assumes that this instance and the other DocumentHierarchicalLevel both share the same hierarchical parent.

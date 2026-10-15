@@ -1,7 +1,9 @@
 import re
 from typing import Protocol
 
-from .Warning import Warning, WarnAndExit
+import warnings
+
+from .Errors import ConverterError
 
 
 class ChapterSplitter:
@@ -38,7 +40,7 @@ class ChapterSplitter:
         # Then use regex extraction
         chapter_name = re.split(self.extractor_regex, extracted_page.text)
         if not chapter_name:
-            WarnAndExit(
+            raise ConverterError(
                 f"Chapter name {chapter_name} not found in extracted page {extracted_page.text}"
             )
         return chapter_name[0]
@@ -61,7 +63,7 @@ class Splitter:
         match = self._find_first_match(patterns, content_text)
         if match:
             return re.sub(match.re.pattern, "", content_text)
-        WarnAndExit("Unable to extract chapter name.")
+        raise ConverterError("Unable to extract chapter name.")
 
     def _holds_new_sublevels(self, patterns, content_text) -> bool:
         return self._find_first_match(patterns, content_text) is not None
@@ -98,14 +100,14 @@ class Splitter:
 
     def _split(self, patterns, content_text) -> list[str]:
         if not self._holds_new_sublevels(patterns, content_text):
-            Warning("split() was called when there was nothing to split.")
+            warnings.warn("split() was called when there was nothing to split.")
             # Wrap the input in a list because the caller expects the
             # returned value to be the result of re.split() (that is a
             # list())
             return [content_text]
         if len(patterns) > 2:
             # Things were simply not tested with more than two patterns...
-            WarnAndExit("Capturing groups ambiguity with too many patterns")
+            raise ConverterError("Capturing groups ambiguity with too many patterns")
         # As stated in the documentation of the re package:
         #    If capturing parentheses are used in pattern, then the text of
         #    all groups in the pattern are also returned as part of the
@@ -131,7 +133,7 @@ class Splitter:
             # Deal with the multiline case
             sublevel_name = re.search(name_extraction_pattern, match.group(0)).group(0)
             return sublevel_name
-        Warning("Sublevel name not found.")
+        warnings.warn("Sublevel name not found.")
         return None
 
 

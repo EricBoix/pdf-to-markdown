@@ -14,7 +14,8 @@ from .Model import (
 )
 from .PageLayout import PageLayout
 from .StructuralInfoBase import StructuralInfoBase
-from .Warning import WarnAndExit
+from .DiagnosticsReporter import DiagnosticsReporter
+from .Errors import ConverterError
 from .LevelBreaker import LevelBreaker
 from .TextSanitizer import TextSanitizer
 from .ParagraphMerger import ParagraphMerger
@@ -33,11 +34,15 @@ class DocumentBuilder(TextSanitizer, ABC):
     """Builds document hierarchy by breaking levels into sublevels."""
 
     def __init__(
-        self, document: DocumentHierarchicalRoot, structural_info: StructuralInfoBase
+        self,
+        document: DocumentHierarchicalRoot,
+        structural_info: StructuralInfoBase,
+        diagnostics: DiagnosticsReporter | None = None,
     ) -> None:
         self.document = document
         self.structural_info = structural_info
-        self._paragraph_merger = ParagraphMerger(structural_info)
+        self._diagnostics = diagnostics if diagnostics is not None else DiagnosticsReporter()
+        self._paragraph_merger = ParagraphMerger(structural_info, diagnostics=self._diagnostics)
 
     def build_document(self) -> None:
         """Build the Document object out of converter extracted chapters."""
@@ -58,7 +63,7 @@ class DocumentBuilder(TextSanitizer, ABC):
         paragraph_layout = paragraph.page_layout
 
         if paragraph.text is None:
-            WarnAndExit(
+            raise ConverterError(
                 "Error: trying to break a paragraph into sentences but "
                 "the paragraph text is None."
             )
@@ -96,6 +101,7 @@ class DocumentBuilder(TextSanitizer, ABC):
             sublevel_factory=Paragraph,
             break_level_callback=self.break_level,
             break_paragraphs_callback=self.break_any_level_chapter_into_paragraphs,
+            diagnostics=self._diagnostics,
         )
         breaker.break_into_sublevels(contents)
         chapter.renumber_sublevels()
@@ -112,6 +118,7 @@ class DocumentBuilder(TextSanitizer, ABC):
             sublevel_factory=subchapter_factory,
             break_level_callback=self.break_level,
             break_paragraphs_callback=self.break_any_level_chapter_into_paragraphs,
+            diagnostics=self._diagnostics,
         )
         breaker.break_into_sublevels()
         chapter.renumber_sublevels()
@@ -127,13 +134,13 @@ class DocumentBuilder(TextSanitizer, ABC):
         if handler:
             handler(level)
             return
-        WarnAndExit(f"Level of type {type(level)} has no break handler.")
+        raise ConverterError(f"Level of type {type(level)} has no break handler.")
 
     def break_sublevels(self, level: DocumentHierarchicalLevel) -> None:
         """Assuming this level was already broken into sublevels, recurse the breaking on its sublevels"""
         sublevels = level.get_sublevels()
         if not sublevels:
-            WarnAndExit("Level without sublevels. Nothing to be done.")
+            raise ConverterError("Level without sublevels. Nothing to be done.")
             return
         for sublevel in sublevels:
             self.break_level(sublevel)

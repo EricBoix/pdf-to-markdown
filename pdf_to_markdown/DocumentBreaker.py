@@ -5,7 +5,8 @@ from .Model import TopLevelChapter
 from .PageLayout import PageLayout
 from .TextExtractor import TextExtractor
 from .TextSanitizer import TextSanitizer
-from .Warning import Warning, WarnAndExit
+from .DiagnosticsReporter import DiagnosticsReporter
+from .Errors import ConverterError
 
 
 class DocumentBreaker:
@@ -19,9 +20,11 @@ class DocumentBreaker:
         pdf_filename,
         document,
         structural_info,
+        diagnostics: DiagnosticsReporter | None = None,
     ) -> None:
         self.document = document
         self.structural_info = structural_info
+        self._diagnostics = diagnostics if diagnostics is not None else DiagnosticsReporter()
         self.chapter_splitter = structural_info.get_chapter_splitter()
 
         # Parse PDF and validate
@@ -35,7 +38,7 @@ class DocumentBreaker:
     def _validate_all_pages(self) -> None:
         """Perform all upfront page validation."""
         if len(self.reader.pages) != self.structural_info.total_page_number:
-            WarnAndExit(
+            raise ConverterError(
                 f"Erroneous number of pages: was expecting "
                 f"{self.structural_info.total_page_number} but got {len(self.reader.pages)}"
             )
@@ -52,7 +55,7 @@ class DocumentBreaker:
         original_reader_page = self.reader.pages[page_number]
         original_reader_page_number = self.reader.get_page_number(original_reader_page)
         if page_number != original_reader_page_number:
-            Warning(
+            self._diagnostics.warn(
                 f"Python page number does not match pypdf::reader page number:\n"
                 f"   - Python page number:  {page_number}\n"
                 f"   - pypdf::reader page number: {original_reader_page_number}"
@@ -71,9 +74,9 @@ class DocumentBreaker:
 
         if page_info.get(key_type) == "chapter":
             if key_chapter_info not in page_info:
-                WarnAndExit(f"Chapter page {page_number} missing chapter_info.")
+                raise ConverterError(f"Chapter page {page_number} missing chapter_info.")
             elif key_name not in page_info[key_chapter_info]:
-                WarnAndExit(f"Chapter page {page_number} missing name in chapter_info.")
+                raise ConverterError(f"Chapter page {page_number} missing name in chapter_info.")
 
     def break_document_into_chapters(
         self,
@@ -105,7 +108,7 @@ class DocumentBreaker:
                     # We didn't encounter a first chapter yet the first
                     # encountered page is not a page starting a chapter.
                     # Something went really wrong.
-                    WarnAndExit(
+                    raise ConverterError(
                         f"Any chapter must start with...a chapter typed page.\nNote: we didn't encounter the first chapter yet.\nThis was the content of the extracted page: {new_extracted_page}"
                     )
                 self.structural_info.set_chapter_page_number(
@@ -124,7 +127,7 @@ class DocumentBreaker:
                     new_extracted_page
                 )
                 if new_chapter_name is None:
-                    WarnAndExit(
+                    raise ConverterError(
                         f"This looks like a new chapter yet it has no name.\nThis was the content of the extracted page: {new_extracted_page}"
                     )
 

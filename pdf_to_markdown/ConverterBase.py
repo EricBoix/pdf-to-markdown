@@ -1,5 +1,7 @@
+from .ConverterConfig import ConverterConfig
+from .DiagnosticsReporter import DiagnosticsReporter
+from .Errors import ConverterError
 from .Model import TopLevelChapter
-from .Warning import WarnAndExit
 from .DocumentBuilder import DocumentBuilder
 from .DocumentBreaker import DocumentBreaker
 
@@ -13,9 +15,14 @@ class ConverterBase(DocumentBuilder):
     chapter, sub-chapter, paragraph...).
     """
 
-    def __init__(self, pdf_filename, document, structural_info) -> None:
+    def __init__(self, pdf_filename, document, structural_info, config: ConverterConfig | None = None) -> None:
         self.pdf_filename = pdf_filename
-        DocumentBuilder.__init__(self, document, structural_info)
+        diagnostics = DiagnosticsReporter(
+            config.warning_mode if config is not None else False,
+            config.debug_mode if config is not None else False,
+        )
+        structural_info.set_diagnostics(diagnostics)
+        DocumentBuilder.__init__(self, document, structural_info, diagnostics)
         self.build_document()
 
     def get_chapter_extracted_page(self, extracted_page):
@@ -27,7 +34,7 @@ class ConverterBase(DocumentBuilder):
             chapter_page_number
         )
         if not chapter_extracted_page:
-            WarnAndExit(
+            raise ConverterError(
                 f"Chapter for page number {extracted_page.page_number} not found."
             )
         return chapter_extracted_page
@@ -40,6 +47,7 @@ class ConverterBase(DocumentBuilder):
             self.pdf_filename,
             self.document,
             self.structural_info,
+            diagnostics=self._diagnostics,
         )
         document_breaker.break_document_into_chapters(ChapterDerived)
 

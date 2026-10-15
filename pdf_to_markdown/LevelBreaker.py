@@ -7,8 +7,8 @@ from .Model import (
 )
 from .PageLayout import PageLayout
 from .TextSanitizer import TextSanitizer
-from .Warning import Warning, WarnAndExit
-from .Traces import Debug
+from .DiagnosticsReporter import DiagnosticsReporter
+from .Errors import ConverterError
 
 
 class Splitter(Protocol):
@@ -40,30 +40,32 @@ class LevelBreaker:
         break_paragraphs_callback: Callable[
             [DocumentHierarchicalLevel, list[ContentWithLayout] | None], None
         ],
+        diagnostics: DiagnosticsReporter | None = None,
     ) -> None:
         self.level = level
         self.level_splitter = level_splitter
         self.sublevel_factory = sublevel_factory
         self.break_level = break_level_callback
         self.break_paragraphs = break_paragraphs_callback
+        self._diagnostics = diagnostics if diagnostics is not None else DiagnosticsReporter()
 
     def break_into_sublevels(
         self, contents: list[ContentWithLayout] | None = None
     ) -> None:
         """Break a hierarchical level into sublevels using the provided splitter."""
-        Debug(f"########### break_into_sublevels, level: {self.level}")
+        self._diagnostics.debug(f"########### break_into_sublevels, level: {self.level}")
 
         if not contents:
             contents = self.level.get_text_with_layout()
             if not contents:
-                Warning(f"DocumentHierarchicalLevel {self.level} with NO text content.")
+                self._diagnostics.warn(f"DocumentHierarchicalLevel {self.level} with NO text content.")
 
         current_level = self.level
         for level_content in contents:
             content_text = level_content.text
-            Debug(f"####### break_into_sublevels, contents: {content_text}")
+            self._diagnostics.debug(f"####### break_into_sublevels, contents: {content_text}")
             if not content_text:
-                Warning(f"level with NO text.")
+                self._diagnostics.warn(f"level with NO text.")
                 continue
 
             content_layout = level_content.page_layout
@@ -71,7 +73,7 @@ class LevelBreaker:
 
             parts = self.level_splitter.split(content_text)
             while parts:
-                Debug(f"### break_into_sublevels, ({len(parts)}) parts: {parts}")
+                self._diagnostics.debug(f"### break_into_sublevels, ({len(parts)}) parts: {parts}")
 
                 new_sublevel, parts = self._try_create_sublevel(new_layout, parts)
                 if new_sublevel:
@@ -114,7 +116,7 @@ class LevelBreaker:
 
         if new_sublevel_type == Paragraph:
             if not parts[0].strip():
-                Warning("Skipping paragraph with empty text.")
+                self._diagnostics.warn("Skipping paragraph with empty text.")
                 return False, remaining
             new_paragraph = Paragraph(new_layout)
             new_paragraph.append_text(parts[0])
@@ -133,7 +135,7 @@ class LevelBreaker:
             self.break_paragraphs(current_level, [ParagraphContent])
             return (not remaining), remaining
 
-        WarnAndExit(
+        raise ConverterError(
             f"Expected Paragraph or ChapterOfParagraphs, got {new_sublevel_type}"
         )
         return False, parts

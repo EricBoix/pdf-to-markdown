@@ -5,14 +5,18 @@ from .Model import (
     Sentence,
     TopLevelChapter,
 )
-from .Warning import Warning, WarnAndExit
+from .DiagnosticsReporter import DiagnosticsReporter
+from .Errors import ConverterError
 
 
 class ParagraphMerger:
     """Handles merging of paragraphs that span across page boundaries."""
 
-    def __init__(self, structural_info) -> None:
+    def __init__(
+        self, structural_info, diagnostics: DiagnosticsReporter | None = None
+    ) -> None:
         self.structural_info = structural_info
+        self._diagnostics = diagnostics if diagnostics is not None else DiagnosticsReporter()
 
     def _page_requires_paragraph_continuation(self, page_number: int) -> bool:
         if page_number not in self.structural_info.pages_info:
@@ -35,11 +39,11 @@ class ParagraphMerger:
                     continue
                 return sublevel_result
             if isinstance(sublevel, Sentence):
-                WarnAndExit("We should have crossed a Paragraph before.")
+                raise ConverterError("We should have crossed a Paragraph before.")
             if isinstance(sublevel, Paragraph):
                 if sublevel.has_page_number(page_number):
                     return sublevel
-        Warning(f"Paragraph of {chapter} with page number {page_number} not found.")
+        self._diagnostics.warn(f"Paragraph of {chapter} with page number {page_number} not found.")
         return None
 
     def _chapter_get_last_paragraph_of_given_page(
@@ -57,7 +61,7 @@ class ParagraphMerger:
                     sublevel_of_that_page = result
                     continue
             if isinstance(sublevel, Sentence):
-                WarnAndExit("We should have crossed a Paragraph before.")
+                raise ConverterError("We should have crossed a Paragraph before.")
             if isinstance(sublevel, Paragraph):
                 if sublevel.has_page_number(page_number):
                     sublevel_of_that_page = sublevel
@@ -103,8 +107,8 @@ class ParagraphMerger:
             if ill_starting_paragraph is None:
                 continue
             if not isinstance(ill_starting_paragraph, Paragraph):
-                Warning("Ill starting paragraph is not ... a paragraph.")
-                Warning("Not merging.")
+                self._diagnostics.warn("Ill starting paragraph is not ... a paragraph.")
+                self._diagnostics.warn("Not merging.")
                 continue
 
             ill_ending_paragraph = self._chapter_get_last_paragraph_of_given_page(
@@ -113,15 +117,15 @@ class ParagraphMerger:
             if ill_ending_paragraph is None:
                 continue
             if not isinstance(ill_ending_paragraph, Paragraph):
-                Warning("Ill ending paragraph is not ... a paragraph.")
-                Warning("Not merging.")
+                self._diagnostics.warn("Ill ending paragraph is not ... a paragraph.")
+                self._diagnostics.warn("Not merging.")
                 continue
             if not ill_ending_paragraph.get_sentences():
                 continue
 
             # Assert that the page_layout of the two paragraphs do differ
             if ill_ending_paragraph.page_layout == ill_starting_paragraph.page_layout:
-                WarnAndExit(
+                raise ConverterError(
                     f"Error: the page layout of the two paragraphs to be merged is the same. This is not expected.\nParagraph ending on page number {page_number} has page layout {repr(ill_ending_paragraph.page_layout)}\nParagraph starting on page number {next_page_number} has page layout {repr(ill_starting_paragraph.page_layout)}"
                 )
 
@@ -129,11 +133,11 @@ class ParagraphMerger:
             if type(ill_starting_paragraph._owning_hierarchical_level) is not type(
                 ill_ending_paragraph._owning_hierarchical_level
             ):
-                Warning(
+                self._diagnostics.warn(
                     f"Choosing not to merge {ill_starting_paragraph} and {ill_ending_paragraph}, because"
                 )
-                Warning("their respective parents are of different types: ")
-                Warning(
+                self._diagnostics.warn("their respective parents are of different types: ")
+                self._diagnostics.warn(
                     f"which are respectively {type(ill_starting_paragraph._owning_hierarchical_level)} and {type(ill_ending_paragraph._owning_hierarchical_level)}."
                 )
                 continue
@@ -143,7 +147,7 @@ class ParagraphMerger:
                 ill_starting_paragraph._owning_hierarchical_level
                 != ill_ending_paragraph._owning_hierarchical_level
             ):
-                Warning(
+                self._diagnostics.warn(
                     f"Choosing not to merge {ill_starting_paragraph} from page {ill_starting_paragraph.page_layout.page_number} and {ill_ending_paragraph} from page {ill_ending_paragraph.page_layout.page_number}, because they are not siblings."
                 )
                 continue

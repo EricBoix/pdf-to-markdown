@@ -26,12 +26,11 @@ from .Splitter import (
     NameLessSinglePatternSplitter,
 )
 from .PageLayout import PageLayout
-from .Warning import Warning, set_warning_mode, WarnAndExit
+from .ConverterConfig import ConverterConfig
+from .Errors import ConverterError
 from .Traces import (
     PrintDocument,
     print_document_raw_pages,
-    Debug,
-    set_debug_mode,
 )
 from .WriteAsLangchainDocuments import WriteAsLangchainDocuments
 

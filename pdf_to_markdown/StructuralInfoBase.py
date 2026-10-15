@@ -1,7 +1,7 @@
 import re
 from abc import ABC, abstractmethod
-from .Warning import Warning, WarnAndExit
-from .Traces import Debug
+from .DiagnosticsReporter import DiagnosticsReporter
+from .Errors import ConverterError
 
 
 class StructuralInfoBase(ABC):
@@ -53,6 +53,10 @@ class StructuralInfoBase(ABC):
         #  - the associated value holds the current chapter number for that key
         self._chapter_page = {}
         self._chapter_splitter_instance = None
+        self._diagnostics = DiagnosticsReporter()
+
+    def set_diagnostics(self, diagnostics: DiagnosticsReporter) -> None:
+        self._diagnostics = diagnostics
 
     def get_chapter_splitter(self):
         """Get or create the chapter splitter for this document.
@@ -72,7 +76,7 @@ class StructuralInfoBase(ABC):
         :param int chapter_page_number The page number of the chapter (beginning) to which the designated belongs to.
         """
         if page_number in self._chapter_page:
-            WarnAndExit(
+            raise ConverterError(
                 f"Trying to overwrite chapter page of page number {page_number}."
             )
         self._chapter_page[page_number] = chapter_page_number
@@ -92,7 +96,7 @@ class StructuralInfoBase(ABC):
 
     def _get_chapter_page_number(self, page_number) -> int:
         if page_number not in self._chapter_page:
-            WarnAndExit(f"Unknown chapter page of page number {page_number}.")
+            raise ConverterError(f"Unknown chapter page of page number {page_number}.")
         return self._chapter_page[page_number]
 
     def _get_chapter_page(self, page_number) -> dict:
@@ -134,14 +138,14 @@ class StructuralInfoBase(ABC):
         for fix_entry in fixes:
             typo = fix_entry[self.KEY_TYPO]
             if not re.search(typo, extracted_page.text):
-                Warning(f"Couldn't find typo in extracted page number {page_number}:")
-                Warning(f"  - typo: {typo}")
-                Warning(f"  - page text: {extracted_page.text}")
+                self._diagnostics.warn(f"Couldn't find typo in extracted page number {page_number}:")
+                self._diagnostics.warn(f"  - typo: {typo}")
+                self._diagnostics.warn(f"  - page text: {extracted_page.text}")
                 continue
             extracted_page.text = re.sub(
                 typo, fix_entry[self.KEY_FIX], extracted_page.text
             )
-            Debug(f"Typo fixed on page {page_number}")
+            self._diagnostics.debug(f"Typo fixed on page {page_number}")
 
     def _get_page_number_finishing_last_paragraph(self, page_number) -> int:
         """

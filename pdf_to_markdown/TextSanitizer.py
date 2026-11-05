@@ -73,6 +73,46 @@ class TextSanitizer:
             "\u1e6d",  # U+1E6D LATIN SMALL LETTER T WITH DOT BELOW
             "t",       # U+0074 ASCII LATIN SMALL LETTER T
         )
+        text = text.replace(
+            "Ā",  # U+0100 LATIN CAPITAL LETTER A WITH MACRON
+            "A",       # U+0041 ASCII LATIN CAPITAL LETTER A
+        )
+        text = text.replace(
+            "Ī",  # U+012A LATIN CAPITAL LETTER I WITH MACRON
+            "I",       # U+0049 ASCII LATIN CAPITAL LETTER I
+        )
+        text = text.replace(
+            "Ś",  # U+015A LATIN CAPITAL LETTER S WITH ACUTE
+            "S",       # U+0053 ASCII LATIN CAPITAL LETTER S
+        )
+        text = text.replace(
+            "ś",  # U+015B LATIN SMALL LETTER S WITH ACUTE
+            "s",       # U+0073 ASCII LATIN SMALL LETTER S
+        )
+        text = text.replace(
+            "ū",  # U+016B LATIN SMALL LETTER U WITH MACRON
+            "u",       # U+0075 ASCII LATIN SMALL LETTER U
+        )
+        text = text.replace(
+            "ṅ",  # U+1E45 LATIN SMALL LETTER N WITH DOT ABOVE
+            "n",       # U+006E ASCII LATIN SMALL LETTER N
+        )
+        text = text.replace(
+            "ṣ",  # U+1E63 LATIN SMALL LETTER S WITH DOT BELOW
+            "s",       # U+0073 ASCII LATIN SMALL LETTER S
+        )
+        text = text.replace(
+            "ḍ",  # U+1E0D LATIN SMALL LETTER D WITH DOT BELOW
+            "d",       # U+0064 ASCII LATIN SMALL LETTER D
+        )
+        text = text.replace(
+            "ṛ",  # U+1E5B LATIN SMALL LETTER R WITH DOT BELOW
+            "r",       # U+0072 ASCII LATIN SMALL LETTER R
+        )
+        text = text.replace(
+            "ḥ",  # U+1E25 LATIN SMALL LETTER H WITH DOT BELOW
+            "h",       # U+0068 ASCII LATIN SMALL LETTER H
+        )
         # fmt: on
         return text
 

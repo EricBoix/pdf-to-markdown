@@ -29,6 +29,16 @@ SENTENCE_CHARACTER_EXAMPLES = [
     ("end…",           "end..."),  # U+2026 HORIZONTAL ELLIPSIS
     ("ānanda",         "ananda"),  # Pali macron-a (U+0101)
     ("ṃetta",          "metta"),   # Pali m with dot below (U+1E43)
+    ("Ānapanasati",    "Anapanasati"),  # capital A with macron (U+0100)
+    ("PĪTI",           "PITI"),    # capital I with macron (U+012A)
+    ("Śamatha",        "Samatha"), # capital S with acute (U+015A)
+    ("Kamalaśila",     "Kamalasila"),  # small s with acute (U+015B)
+    ("Sūtra",          "Sutra"),   # small u with macron (U+016B)
+    ("Laṅkāvatāra",    "Lankavatara"), # small n with dot above (U+1E45), plus ā
+    ("trilakṣaṇa",     "trilaksana"),  # small s with dot below (U+1E63), plus ṇ
+    ("Upaḍḍha",        "Upaddha"), # small d with dot below (U+1E0D)
+    ("smṛti",          "smrti"),   # small r with dot below (U+1E5B)
+    ("duḥkha",         "duhkha"),  # small h with dot below (U+1E25)
     ("☺",              ":-)"),     # U+263A WHITE SMILING FACE
 ]
 

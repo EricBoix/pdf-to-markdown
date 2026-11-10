@@ -118,6 +118,11 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
     The type parameter T specifies the allowed sublevel type.
     """
 
+    # Trailing punctuation characters that markdownlint rule MD026 rejects in
+    # a header (the rule's default set, which notably excludes '?').
+    HEADER_TRAILING_PUNCTUATION = ".,;:!。，；：！"
+    MARKDOWNLINT_DISABLE_MD026 = "<!-- markdownlint-disable-line MD026 -->"
+
     def __init__(self, name: str) -> None:
         Numbered.__init__(self)
         Parent.__init__(self)
@@ -258,7 +263,12 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         # starts with two newlines: a header followed by a paragraph would thus
         # get two blank lines instead of one. Hence we write the (atx) header
         # ourselves, without its trailing newline.
-        md_file.write("\n" + "#" * level + " " + self.name)
+        header = "#" * level + " " + self.name
+        if self.name.endswith(tuple(self.HEADER_TRAILING_PUNCTUATION)):
+            # The punctuation legitimately comes from the original document:
+            # silence markdownlint (MD026) for this very line only.
+            header += self.MARKDOWNLINT_DISABLE_MD026
+        md_file.write("\n" + header)
         if self.sublevels and not isinstance(self.sublevels[0], Paragraph):
             # A sub header (unlike a paragraph) does not start with a blank
             # line of its own: provide the blank line separating the headers.

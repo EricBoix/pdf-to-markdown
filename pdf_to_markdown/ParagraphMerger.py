@@ -127,6 +127,13 @@ class ParagraphMerger:
                 continue
             if not ill_ending_paragraph.get_sentences():
                 continue
+            # A complete last sentence means there is nothing to continue: not
+            # merging is then correct, whatever the hierarchical parents are.
+            last_sentence_of_ill_ending_paragraph = (
+                ill_ending_paragraph.get_sentences()[-1]
+            )
+            if last_sentence_of_ill_ending_paragraph.is_complete():
+                continue
 
             # Assert that the page_layout of the two paragraphs do differ
             if ill_ending_paragraph.page_layout == ill_starting_paragraph.page_layout:
@@ -139,7 +146,10 @@ class ParagraphMerger:
                 ill_ending_paragraph._owning_hierarchical_level
             ):
                 self._diagnostics.warn(
-                    f"Choosing not to merge {ill_starting_paragraph} and {ill_ending_paragraph}, because"
+                    f"Choosing not to merge the paragraph ending page {ill_ending_paragraph.page_layout.page_number} "
+                    f"(ends with: {last_sentence_of_ill_ending_paragraph.text[-60:]!r}) and the paragraph starting page "
+                    f"{ill_starting_paragraph.page_layout.page_number} "
+                    f"(starts with: {ill_starting_paragraph.get_sentences()[0].text[:60]!r}), because"
                 )
                 self._diagnostics.warn("their respective parents are of different types: ")
                 self._diagnostics.warn(
@@ -153,7 +163,10 @@ class ParagraphMerger:
                 != ill_ending_paragraph._owning_hierarchical_level
             ):
                 self._diagnostics.warn(
-                    f"Choosing not to merge {ill_starting_paragraph} from page {ill_starting_paragraph.page_layout.page_number} and {ill_ending_paragraph} from page {ill_ending_paragraph.page_layout.page_number}, because they are not siblings."
+                    f"Choosing not to merge the paragraph ending page {ill_ending_paragraph.page_layout.page_number} "
+                    f"(ends with: {last_sentence_of_ill_ending_paragraph.text[-60:]!r}) and the paragraph starting page "
+                    f"{ill_starting_paragraph.page_layout.page_number} "
+                    f"(starts with: {ill_starting_paragraph.get_sentences()[0].text[:60]!r}), because they are not siblings."
                 )
                 continue
 
@@ -161,11 +174,6 @@ class ParagraphMerger:
             first_sentence_of_ill_starting_paragraph = (
                 ill_starting_paragraph.get_sentences()[0]
             )
-            last_sentence_of_ill_ending_paragraph = (
-                ill_ending_paragraph.get_sentences()[-1]
-            )
-            if last_sentence_of_ill_ending_paragraph.is_complete():
-                continue
             # First merge the two sentences:
             last_sentence_of_ill_ending_paragraph.append(
                 first_sentence_of_ill_starting_paragraph

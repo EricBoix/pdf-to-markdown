@@ -49,6 +49,13 @@ class MarkdownToDocument:
         self._filepath = filepath
 
     def get_document(self) -> Document:
+        try:
+            pypandoc.get_pandoc_path()
+        except OSError as error:
+            raise OSError(
+                "pandoc executable not found. On macOS (Apple Silicon) install it "
+                "with: brew install pandoc"
+            ) from error
         # markdown-smart disables pandoc's smart-quotes extension so ASCII
         # ' and " are not converted to typographic equivalents in the AST.
         blocks = json.loads(

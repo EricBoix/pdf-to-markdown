@@ -11,7 +11,9 @@ dependencies = [
     "nltk>=3.9.1",
     "mdutils",
     "pypandoc",
-    "pypandoc-binary"
+    # The pypandoc-binary 1.17 macOS arm64 wheel bundles an x86_64 pandoc that
+    # cannot run: on Apple Silicon the system pandoc (brew install pandoc) is used.
+    "pypandoc-binary; sys_platform != 'darwin' or platform_machine != 'arm64'",
 ]
 
 [project.optional-dependencies]

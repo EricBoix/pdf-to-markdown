@@ -8,6 +8,10 @@ A Python package for converting PDF documents to Markdown format.
 pip install git+https://github.com/EricBoix/pdf-to-markdown.git
 ```
 
+On macOS with Apple Silicon the bundled `pandoc` of `pypandoc-binary` is
+not usable (x86_64 only): it is not installed there and the system `pandoc` is
+used instead, hence run `brew install pandoc` first.
+
 ## Usage
 
 ```python

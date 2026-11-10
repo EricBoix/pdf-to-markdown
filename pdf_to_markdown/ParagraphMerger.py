@@ -43,7 +43,6 @@ class ParagraphMerger:
             if isinstance(sublevel, Paragraph):
                 if sublevel.has_page_number(page_number):
                     return sublevel
-        self._diagnostics.warn(f"Paragraph of {chapter} with page number {page_number} not found.")
         return None
 
     def _chapter_get_last_paragraph_of_given_page(
@@ -105,6 +104,12 @@ class ParagraphMerger:
                 top_level_chapter, next_page_number
             )
             if ill_starting_paragraph is None:
+                # Only the search over the whole top level chapter failing is
+                # anomalous: sub chapters not holding the page is expected.
+                self._diagnostics.warn(
+                    f"No paragraph with page number {next_page_number} found "
+                    f"(needed to continue the paragraph of page {page_number})."
+                )
                 continue
             if not isinstance(ill_starting_paragraph, Paragraph):
                 self._diagnostics.warn("Ill starting paragraph is not ... a paragraph.")

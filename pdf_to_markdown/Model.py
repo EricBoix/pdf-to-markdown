@@ -254,11 +254,15 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         """
         if not self.name:
             raise ConverterError("No name for markdown conversion.")
-        md_file.new_header(
-            level=level,
-            title=self.name,
-            add_table_of_contents="n",
-        )
+        # MdUtils.new_header() ends with a newline and MdUtils.new_paragraph()
+        # starts with two newlines: a header followed by a paragraph would thus
+        # get two blank lines instead of one. Hence we write the (atx) header
+        # ourselves, without its trailing newline.
+        md_file.write("\n" + "#" * level + " " + self.name)
+        if self.sublevels and not isinstance(self.sublevels[0], Paragraph):
+            # A sub header (unlike a paragraph) does not start with a blank
+            # line of its own: provide the blank line separating the headers.
+            md_file.write("\n")
         if self.sublevels:
             for sublevel in self.sublevels:
                 if sublevel is not None:

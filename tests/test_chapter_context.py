@@ -31,6 +31,16 @@ def test_normalize_chapter_name_inter_word_newline_becomes_space():
     assert TextSanitizer.normalize_chapter_name("The\nWay") == "The Way"
 
 
+def test_normalize_chapter_name_uppercase_word_then_capitalized_word():
+    # An uppercase word followed on the next line by a merely capitalized word
+    # (e.g. "FIRST INTERLUDE\nConscious Experience") is a line-break between
+    # words, not a mid-word split: it must become a space.
+    assert (
+        TextSanitizer.normalize_chapter_name("FIRST INTERLUDE\nConscious Experience")
+        == "FIRST INTERLUDE Conscious Experience"
+    )
+
+
 def test_normalize_chapter_name_mixed_split_and_diacritic():
     # Both rules apply in sequence: mid-word collapse then diacritic fold.
     # ā (U+0101, Pali macron-a) precedes the split; W and K are ASCII uppercase.

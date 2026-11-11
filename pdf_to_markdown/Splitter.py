@@ -47,7 +47,10 @@ class ChapterSplitter:
 
     def extract_chapter_name(self, extracted_page, chapter_name) -> None:
         """Remove chapter name from page text."""
-        extracted_page.text = extracted_page.text.lstrip(chapter_name)
+        # removeprefix (and not lstrip) because lstrip treats its argument as
+        # a set of characters and would also eat the leading characters of the
+        # body text that happen to belong to the chapter name.
+        extracted_page.text = extracted_page.text.removeprefix(chapter_name)
 
 
 class Splitter:
@@ -134,7 +137,8 @@ class Splitter:
         if match:
             # Deal with the multiline case
             sublevel_name = re.search(name_extraction_pattern, match.group(0)).group(0)
-            return sublevel_name
+            # Strip the pdf layout whitespaces (e.g. centered titles)
+            return sublevel_name.strip()
         self._logger.warning("Sublevel name not found.")
         return None
 

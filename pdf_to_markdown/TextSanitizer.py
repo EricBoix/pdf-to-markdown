@@ -184,7 +184,10 @@ class TextSanitizer:
         words and are replaced with a space.  sanitize_characters() is then
         applied to fold any remaining non-ASCII characters.
         """
-        name = re.sub(r"([A-Z])\n([A-Z])", r"\1\2", raw_name)
+        # The right-hand side must continue with a second uppercase letter,
+        # otherwise a capitalized word starting a new line (e.g.
+        # "INTERLUDE\nConscious") would wrongly be glued to the previous word.
+        name = re.sub(r"([A-Z])\n([A-Z])(?=[A-Z])", r"\1\2", raw_name)
         name = name.replace("\n", " ")
         return TextSanitizer.sanitize_characters(name)
 

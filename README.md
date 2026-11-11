@@ -8,6 +8,8 @@ A Python package for converting PDF documents to Markdown format.
 pip install git+https://github.com/EricBoix/pdf-to-markdown.git
 ```
 
+### macOS special instructions
+
 On macOS with Apple Silicon the bundled `pandoc` of `pypandoc-binary` is
 not usable (x86_64 only): it is not installed there and the system `pandoc` is
 used instead, hence run `brew install pandoc` first.
@@ -88,6 +90,22 @@ classDiagram
   ExtractedPage --> Page
 
 ```
+
+
+### Diagnostics
+
+The package reports warnings and debug traces through the standard `logging`
+module, with the logger named `pdf_to_markdown`. It is silent by default: the
+application decides what to show, e.g.
+
+```python
+import logging
+
+logging.basicConfig(level=logging.WARNING)  # or logging.DEBUG for the traces
+```
+
+(`ConverterConfig` and the `config` parameter of the converters were removed:
+they only held the former `warning_mode` and `debug_mode` switches.)
 
 ## References
 

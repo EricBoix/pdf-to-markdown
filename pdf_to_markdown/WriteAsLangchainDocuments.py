@@ -1,4 +1,3 @@
-import sys
 import json
 from .Model import (
     TopLevelChapterOfParagraphs,
@@ -83,9 +82,7 @@ class WriteAsLangchainDocuments:
                 )
                 continue
             else:
-                print("Level ", sublevel, "not serializable as sentences ???")
-                print("Exiting.")
-                sys.exit()
+                raise TypeError(f"Level {sublevel} not serializable as sentences.")
         return collected_sentences
 
     def write_sentences(self, output_json_filename) -> None:

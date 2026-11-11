@@ -1,4 +1,3 @@
-from .ConverterConfig import ConverterConfig
 from .DiagnosticsReporter import DiagnosticsReporter
 from .Errors import ConverterError
 from .Model import TopLevelChapter
@@ -15,12 +14,9 @@ class ConverterBase(DocumentBuilder):
     chapter, sub-chapter, paragraph...).
     """
 
-    def __init__(self, pdf_filename, document, structural_info, config: ConverterConfig | None = None) -> None:
+    def __init__(self, pdf_filename, document, structural_info) -> None:
         self.pdf_filename = pdf_filename
-        diagnostics = DiagnosticsReporter(
-            config.warning_mode if config is not None else False,
-            config.debug_mode if config is not None else False,
-        )
+        diagnostics = DiagnosticsReporter()
         structural_info.set_diagnostics(diagnostics)
         DocumentBuilder.__init__(self, document, structural_info, diagnostics)
         self.build_document()

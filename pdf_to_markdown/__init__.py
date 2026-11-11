@@ -1,3 +1,8 @@
+import logging
+
+# Library convention: stay silent unless the application configures logging.
+logging.getLogger("pdf_to_markdown").addHandler(logging.NullHandler())
+
 from .Model import (
     Sentence,
     Paragraph,
@@ -26,7 +31,6 @@ from .Splitter import (
     NameLessSinglePatternSplitter,
 )
 from .PageLayout import PageLayout
-from .ConverterConfig import ConverterConfig
 from .Errors import ConverterError
 from .Traces import (
     PrintDocument,

@@ -1,7 +1,7 @@
 import re
 from typing import Protocol
 
-import warnings
+import logging
 
 from .Errors import ConverterError
 
@@ -51,6 +51,8 @@ class ChapterSplitter:
 
 
 class Splitter:
+    _logger = logging.getLogger("pdf_to_markdown")
+
     def _find_first_match(self, patterns, content_text) -> re.Match[str] | None:
         """Return first regex match across patterns, or None."""
         for pattern in patterns:
@@ -100,7 +102,7 @@ class Splitter:
 
     def _split(self, patterns, content_text) -> list[str]:
         if not self._holds_new_sublevels(patterns, content_text):
-            warnings.warn("split() was called when there was nothing to split.")
+            self._logger.warning("split() was called when there was nothing to split.")
             # Wrap the input in a list because the caller expects the
             # returned value to be the result of re.split() (that is a
             # list())
@@ -133,7 +135,7 @@ class Splitter:
             # Deal with the multiline case
             sublevel_name = re.search(name_extraction_pattern, match.group(0)).group(0)
             return sublevel_name
-        warnings.warn("Sublevel name not found.")
+        self._logger.warning("Sublevel name not found.")
         return None
 
 

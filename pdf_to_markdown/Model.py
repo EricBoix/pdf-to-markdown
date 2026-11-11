@@ -13,7 +13,7 @@ for resource, path in [
         nltk.data.find(path)
     except LookupError:
         nltk.download(resource, quiet=True)
-import warnings
+import logging
 
 from .Errors import ConverterError
 from .PageLayout import PageLayout
@@ -123,12 +123,14 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
     HEADER_TRAILING_PUNCTUATION = ".,;:!。，；：！"
     MARKDOWNLINT_DISABLE_MD026 = "<!-- markdownlint-disable-line MD026 -->"
 
+    _logger = logging.getLogger("pdf_to_markdown")
+
     def __init__(self, name: str) -> None:
         Numbered.__init__(self)
         Parent.__init__(self)
         self.name: str = name
         if not self.name:
-            warnings.warn("DocumentHierarchicalLevel created with no given name.")
+            self._logger.warning("DocumentHierarchicalLevel created with no given name.")
         # The text capturing this level as extracted from the original document.
         # Note that this text is only used in order to construct this model
         # during the hierarchical breakdown. Eventually all the text content
@@ -162,7 +164,7 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
 
     def get_last_sublevel(self) -> T | None:
         if not self.sublevels:
-            warnings.warn("No sublevels found.")
+            self._logger.warning("No sublevels found.")
             return None
         return self.sublevels[-1]
 
@@ -199,7 +201,7 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         for sublevel in self.sublevels:
             if sublevel.page_layout.page_number == page_number:
                 return sublevel
-        warnings.warn(
+        self._logger.warning(
             f"unable to find the first sublevel of page number {page_number} in hierarchy {self.name}"
         )
         return None
@@ -210,7 +212,7 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
             if sublevel.page_layout.page_number == page_number:
                 sublevel_of_that_page = sublevel
         if sublevel_of_that_page is None:
-            warnings.warn(
+            self._logger.warning(
                 f"unable to find the last sublevel of page number {page_number} in hierarchy {self.name}"
             )
         return sublevel_of_that_page
@@ -234,14 +236,14 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
                 #    to the same SuperChapter)
                 # Although the paragraphs follow themselves, they do not share
                 # the same parent (but the same grand-parent).
-                warnings.warn(f"Choosing not to merge {self} and {other}, because")
-                warnings.warn(f"their respective parent are of different types, that")
-                warnings.warn(
+                self._logger.warning(f"Choosing not to merge {self} and {other}, because")
+                self._logger.warning(f"their respective parent are of different types, that")
+                self._logger.warning(
                     f"are {type(self.owning_hierarchical_level)} and {type(other.owning_hierarchical_level)}."
                 )
                 return
             else:
-                warnings.warn(
+                self._logger.warning(
                     f"Choosing not to merge {self} from page {self.page_layout.page_number} and {other} from page {other.page_layout.page_number}, because they are not siblings."
                 )
                 return
@@ -323,8 +325,8 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
         """
         sentences = self.get_sublevels()
         if not sentences:
-            warnings.warn("Useless paragraph with no sentences.")
-            warnings.warn("Optimisation inquiry required.")
+            self._logger.warning("Useless paragraph with no sentences.")
+            self._logger.warning("Optimisation inquiry required.")
             return
         # Note: we can not delegate the markdown generation to
         # Sentence.to_markdown() since we would have to use md_file.new_line()
@@ -342,7 +344,7 @@ class BlockQuoteParagraph(Paragraph):
     def to_markdown(self, md_file: MdUtils, dummy_level) -> None:
         sentences = self.get_sublevels()
         if not sentences:
-            warnings.warn("Useless blockquote paragraph with no sentences.")
+            self._logger.warning("Useless blockquote paragraph with no sentences.")
             return
         paragraph_as_text = " ".join([sentence.text for sentence in sentences])
         md_file.new_paragraph("> " + paragraph_as_text)
@@ -461,6 +463,8 @@ class DocumentHierarchicalRoot:
     A list of Chapters.
     """
 
+    _logger = logging.getLogger("pdf_to_markdown")
+
     def __init__(
         self, title, publication_info: "PublicationInfo | None" = None
     ) -> None:
@@ -474,7 +478,7 @@ class DocumentHierarchicalRoot:
         chapter = self.get_first_sublevel_of_given_page(page_number)
         if chapter:
             return chapter.name
-        warnings.warn(f"chapter with page number {page_number} not found.")
+        self._logger.warning(f"chapter with page number {page_number} not found.")
         return None
 
     def to_markdown(self, filepath: str) -> None:

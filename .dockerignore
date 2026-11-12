@@ -1,0 +1,12 @@
+# Applies when jejune_cli hands this repository to `docker build` as the named
+# context pdf-to-markdown (--local-pdf-to-markdown): keeps host-only content out.
+# .git is deliberately kept: setuptools-scm derives the version (git commit
+# included) from it when the image is built.
+.claude
+.vscode
+.venv
+**/__pycache__
+.pytest_cache
+.coverage
+build
+*.egg-info

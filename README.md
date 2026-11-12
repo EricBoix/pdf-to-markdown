@@ -20,6 +20,37 @@ used instead, hence run `brew install pandoc` first.
 from pdf_to_markdown import ConverterBase, DocumentBuilder, TextExtractor
 ```
 
+## Version
+
+The version is not written down in `pyproject.toml`: `setuptools-scm` derives it
+from git when the package is built or installed, and the git commit is part of it.
+Without any git tag the version reads `0.1.1.dev<commits>+g<sha>`, e.g.
+`0.1.1.dev41+gf6691d12d` (`0.1.0` when git is not available).
+A working tree with uncommitted changes adds a date, e.g. `….d20261112`: it tells
+that the tree was dirty, not which changes.
+
+Print the version of what is installed (also inside a converter image):
+
+```bash
+python -c "import importlib.metadata as m; print(m.version('pdf-to-markdown'))"
+```
+
+## Testing a change against the jejune documents
+
+Before pushing anything, check a change against every `jejune_doc_*` converter
+(see `jejune converters build --help` in `jejune_cli`):
+
+1. **Commit locally, do not push.** The version above then carries the commit
+   (`+g<sha>`), which identifies exactly what was tested. Uncommitted changes make
+   different test runs look alike (same version, only the date differs).
+   A rejected local commit costs nothing: `git reset` it, GitHub never saw it.
+2. `jejune converters build --local-pdf-to-markdown` (or `--local`)
+3. `jejune converters test --no-build` (without `--no-build` the images are rebuilt
+   with the locked pdf-to-markdown).
+
+The `.git` directory is part of what `jejune converters build` copies into the image
+(see `.dockerignore`): it is what makes the version available there.
+
 ## Package testing
 
 ```bash

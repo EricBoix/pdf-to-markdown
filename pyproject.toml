@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["black", "pytest>=8.0", "pytest-cov", "fpdf2"]
+dev = ["pytest>=8.0", "pytest-cov", "fpdf2"]
 
 [tool.setuptools]
 packages = ["pdf_to_markdown"]

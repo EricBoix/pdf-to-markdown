@@ -29,7 +29,10 @@ from .Splitter import (
     Splitter,
     MultiplePatternSplitter,
     NameLessSinglePatternSplitter,
+    ParagraphAndBlockquoteSplitter,
+    BlockquoteText,
 )
+from .BlockquoteDeduplicator import BlockquoteDeduplicator
 from .PageLayout import PageLayout
 from .Errors import ConverterError
 from .Traces import (

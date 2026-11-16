@@ -336,7 +336,12 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
 
 
 class BlockQuoteParagraph(Paragraph):
-    """A paragraph that originated from a markdown blockquote (> …)."""
+    """A paragraph that originated from a markdown blockquote (> …).
+
+    It may also originate from a pdf document, as a block set apart from the
+    running text (e.g. a pull quote). Such a block is detected by the
+    ParagraphAndBlockquoteSplitter of the book's structural info.
+    """
 
     def __init__(self, layout: PageLayout) -> None:
         Paragraph.__init__(self, layout)

@@ -53,8 +53,24 @@ class ChapterSplitter:
         extracted_page.text = extracted_page.text.removeprefix(chapter_name)
 
 
+class BlockquoteText(str):
+    """The text of a part, produced by a splitter, that is a blockquote.
+
+    This is a plain str (the splitters return lists of str) whose only purpose
+    is to carry the information "this part is a blockquote" along with the
+    text, see Splitter.is_blockquote().
+    """
+
+
 class Splitter:
     _logger = logging.getLogger("pdf_to_markdown")
+
+    def is_blockquote(self, part_text) -> bool:
+        """Whether a part returned by split() is a blockquote (and not e.g. a paragraph).
+
+        Splitters that do not detect blockquotes never return one.
+        """
+        return False
 
     def _find_first_match(self, patterns, content_text) -> re.Match[str] | None:
         """Return first regex match across patterns, or None."""
@@ -218,3 +234,43 @@ class NameLessSinglePatternSplitter(SinglePatternSplitter):
 
     def extract_sublevel_name(self, dummy_content_text) -> None:
         return
+
+
+class ParagraphAndBlockquoteSplitter(NameLessSinglePatternSplitter):
+    """Breaks a text into paragraphs and blockquotes, preserving reading order.
+
+    A blockquote (e.g. a pull quote of a book page) typically cannot be told
+    from the paragraphs by the paragraph breaking pattern: its lines (that are
+    not paragraph beginnings) might even match that pattern, thus being broken
+    into one paragraph per line. The blockquotes are thus cut out of the text
+    first, with their own pattern, and the paragraph breaking pattern is only
+    applied to the text surrounding them.
+    """
+
+    def __init__(self, paragraph_breaking_pattern, blockquote_pattern) -> None:
+        """
+        :param paragraph_breaking_pattern: the pattern separating paragraphs
+        :param blockquote_pattern: the pattern matching a whole blockquote
+            (including the separation with its surrounding text). Its first
+            capturing group is the text of the blockquote.
+        """
+        NameLessSinglePatternSplitter.__init__(self, paragraph_breaking_pattern)
+        self.blockquote_pattern = re.compile(blockquote_pattern)
+
+    def is_blockquote(self, part_text) -> bool:
+        return isinstance(part_text, BlockquoteText)
+
+    def split(self, content_text) -> list[str]:
+        parts = []
+        position = 0
+        for match in self.blockquote_pattern.finditer(content_text):
+            parts += self._split_into_paragraphs(content_text[position : match.start()])
+            parts.append(BlockquoteText(match.group(1)))
+            position = match.end()
+        parts += self._split_into_paragraphs(content_text[position:])
+        return parts
+
+    def _split_into_paragraphs(self, text_without_blockquote) -> list[str]:
+        if not text_without_blockquote.strip():
+            return []
+        return NameLessSinglePatternSplitter.split(self, text_without_blockquote)

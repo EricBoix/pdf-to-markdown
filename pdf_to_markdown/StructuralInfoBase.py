@@ -138,7 +138,9 @@ class StructuralInfoBase(ABC):
         for fix_entry in fixes:
             typo = fix_entry[self.KEY_TYPO]
             if not re.search(typo, extracted_page.text):
-                self._diagnostics.warn(f"Couldn't find typo in extracted page number {page_number}:")
+                self._diagnostics.warn(
+                    f"Couldn't find typo in extracted page number {page_number}:"
+                )
                 self._diagnostics.warn(f"  - typo: {typo}")
                 self._diagnostics.warn(f"  - page text: {extracted_page.text}")
                 continue
@@ -176,3 +178,15 @@ class StructuralInfoBase(ABC):
     def sanitize_page_text(self, extracted_page) -> None:
         """Sanitize page text. Override in derived classes for book-specific sanitization."""
         pass
+
+    def strip_page_text_leading_whitespace(self, page_text: str) -> str:
+        """Remove the leading whitespace of the text extracted from a page.
+
+        The default removes all of it. A derived class that must keep the
+        indentation of the first line of a page (e.g. when a blockquote starts
+        at the very top of a page and is recognized by its indentation) can
+        override this method. Note that the chapter detection of the text
+        extracted from a page (holds_new_chapter, extract_chapter_name) assumes
+        text without leading whitespace.
+        """
+        return page_text.lstrip()

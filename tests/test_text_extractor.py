@@ -23,6 +23,9 @@ def _make_mock(page_texts: list[str]):
     mock_si = MagicMock()
     mock_si.total_page_number = len(page_texts)
     mock_si._page_is_dropped.return_value = False
+    mock_si.strip_page_text_leading_whitespace.side_effect = (
+        lambda page_text: page_text.lstrip()
+    )
 
     return mock_reader, mock_si
 
@@ -67,6 +70,9 @@ def test_extract_all_layout_mode_fallback():
     mock_si = MagicMock()
     mock_si.total_page_number = 1
     mock_si._page_is_dropped.return_value = False
+    mock_si.strip_page_text_leading_whitespace.side_effect = (
+        lambda page_text: page_text.lstrip()
+    )
 
     result = TextExtractor(mock_reader, mock_si).extract_all()
     assert result == {0: "fallback text"}

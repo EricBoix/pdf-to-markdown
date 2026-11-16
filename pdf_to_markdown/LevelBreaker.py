@@ -1,6 +1,7 @@
 from typing import Callable, Protocol
 
 from .Model import (
+    BlockQuoteParagraph,
     DocumentHierarchicalLevel,
     SubChapterOfParagraphs,
     Paragraph,
@@ -16,6 +17,7 @@ class Splitter(Protocol):
 
     def split(self, content_text: str) -> list[str]: ...
     def get_sublevel_name(self, content_text: str) -> str | None: ...
+    def is_blockquote(self, part_text: str) -> bool: ...
 
 
 class ContentWithLayout(Protocol):
@@ -118,7 +120,12 @@ class LevelBreaker:
             if not parts[0].strip():
                 self._diagnostics.warn("Skipping paragraph with empty text.")
                 return False, remaining
-            new_paragraph = Paragraph(new_layout)
+            paragraph_class = (
+                BlockQuoteParagraph
+                if self.level_splitter.is_blockquote(parts[0])
+                else Paragraph
+            )
+            new_paragraph = paragraph_class(new_layout)
             new_paragraph.append_text(parts[0])
             self.break_level(new_paragraph)
             current_level.add_sublevel(new_paragraph)

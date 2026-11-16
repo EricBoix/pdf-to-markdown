@@ -27,5 +27,10 @@ class TextExtractor:
             # Normalize tabs to spaces (some PDFs have tabs instead of spaces)
             text = text.replace("\t", " ")
             # lstrip is required before holds_new_chapter classification
-            extracted_texts[page_number] = text.lstrip()
+            # It is delegated to the structural info because a book might
+            # have to keep the indentation of the first line of a page (e.g.
+            # a blockquote starting at the very top of a page).
+            extracted_texts[page_number] = (
+                self.structural_info.strip_page_text_leading_whitespace(text)
+            )
         return extracted_texts

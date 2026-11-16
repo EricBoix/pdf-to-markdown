@@ -1,6 +1,7 @@
 from .Model import (
     TopLevelChapterOfParagraphs,
     SubChapterOfParagraphs,
+    BlockQuoteParagraph,
     Paragraph,
     Sentence,
     TopLevelChapter,
@@ -10,8 +11,22 @@ from .Errors import ConverterError
 
 
 class ParagraphMerger:
-    """Handles merging of paragraphs that span across page boundaries."""
+    """Handles merging of paragraphs that span across page boundaries.
 
+    Blockquotes (e.g. the pull quotes of a book page) are ignored when looking
+    for "the first/last paragraph of a page". A blockquote is a floating box
+    placed on the page: it is not part of the running text that flows from the
+    bottom of a page to the top of the next one. When a blockquote happens to
+    be the last (resp. first) element of a page, selecting it would break the
+    reconstitution of a paragraph that spreads over two pages:
+    - as the last element of its page: the blockquote (that usually ends with a
+      complete sentence) would be taken for the end of the page, no merge would
+      be attempted, and the paragraph cut by the page break would stay in two
+      pieces;
+    - as the first element of its page: the blockquote would be merged as if it
+      was the continuation of the unfinished sentence of the previous page.
+    Skipping blockquotes on both sides keeps the text flow intact.
+    """
     def __init__(
         self, structural_info, diagnostics: DiagnosticsReporter | None = None
     ) -> None:
@@ -40,6 +55,8 @@ class ParagraphMerger:
                 return sublevel_result
             if isinstance(sublevel, Sentence):
                 raise ConverterError("We should have crossed a Paragraph before.")
+            if isinstance(sublevel, BlockQuoteParagraph):
+                continue  # Not part of the text flow, see class documentation
             if isinstance(sublevel, Paragraph):
                 if sublevel.has_page_number(page_number):
                     return sublevel
@@ -61,6 +78,8 @@ class ParagraphMerger:
                     continue
             if isinstance(sublevel, Sentence):
                 raise ConverterError("We should have crossed a Paragraph before.")
+            if isinstance(sublevel, BlockQuoteParagraph):
+                continue  # Not part of the text flow, see class documentation
             if isinstance(sublevel, Paragraph):
                 if sublevel.has_page_number(page_number):
                     sublevel_of_that_page = sublevel

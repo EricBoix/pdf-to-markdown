@@ -33,6 +33,7 @@ from .Splitter import (
     BlockquoteText,
 )
 from .BlockquoteDeduplicator import BlockquoteDeduplicator
+from .SectionDropper import SectionDropper
 from .PageLayout import PageLayout
 from .Errors import ConverterError
 from .Traces import (

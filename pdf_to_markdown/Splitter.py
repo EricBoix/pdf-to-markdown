@@ -271,6 +271,15 @@ class ParagraphAndBlockquoteSplitter(NameLessSinglePatternSplitter):
         return parts
 
     def _split_into_paragraphs(self, text_without_blockquote) -> list[str]:
+        # The text following a blockquote starts with the separator of the
+        # next paragraph. It carries no information and
+        # _split_on_single_pattern() only copes with such a leading separator
+        # when the breaking pattern holds a capturing group.
+        leading_separator = re.match(self.breaking_pattern, text_without_blockquote)
+        if leading_separator:
+            text_without_blockquote = text_without_blockquote[
+                leading_separator.end() :
+            ]
         if not text_without_blockquote.strip():
             return []
         return NameLessSinglePatternSplitter.split(self, text_without_blockquote)

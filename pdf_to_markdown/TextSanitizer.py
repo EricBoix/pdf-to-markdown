@@ -200,6 +200,17 @@ class TextSanitizer:
         input_text = TextSanitizer._normalize_symbols(input_text)
         return input_text
 
+    @staticmethod
+    def normalize_spaced_ellipsis(input_text: str) -> str:
+        """Turn a spaced ellipsis (". . .") into a plain one ("...").
+
+        The sentence tokenizer does not see a spaced ellipsis as such: it cuts
+        it into one sentence per dot e.g. 'there is .', '.', '.' whereas a
+        plain ellipsis stays within its sentence. This must thus be applied
+        before the text gets tokenized into sentences.
+        """
+        return re.sub(r"(?<=\S) ?\. \. \.", "...", input_text)
+
     _MISMATCH_START = "<<PDF_TO_MARKDOWN DETECTED MISSMATCH: START>>"
     _MISMATCH_END = "<<PDF_TO_MARKDOWN DETECTED MISSMATCH: END>>"
 

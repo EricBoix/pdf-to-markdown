@@ -4,12 +4,14 @@ metta
 ṃetta
 # Technical
 blockquotes
-pytest
-venv
+Deduplicator
 fileutils
 mdutils
 nltk
 pandoc
+pycache
 pypandoc
 pypdf
+pytest
 setuptools
+venv

@@ -27,11 +27,14 @@ class ParagraphMerger:
       was the continuation of the unfinished sentence of the previous page.
     Skipping blockquotes on both sides keeps the text flow intact.
     """
+
     def __init__(
         self, structural_info, diagnostics: DiagnosticsReporter | None = None
     ) -> None:
         self.structural_info = structural_info
-        self._diagnostics = diagnostics if diagnostics is not None else DiagnosticsReporter()
+        self._diagnostics = (
+            diagnostics if diagnostics is not None else DiagnosticsReporter()
+        )
 
     def _page_requires_paragraph_continuation(self, page_number: int) -> bool:
         if page_number not in self.structural_info.pages_info:
@@ -154,51 +157,160 @@ class ParagraphMerger:
             if last_sentence_of_ill_ending_paragraph.is_complete():
                 continue
 
-            # Assert that the page_layout of the two paragraphs do differ
-            if ill_ending_paragraph.page_layout == ill_starting_paragraph.page_layout:
-                raise ConverterError(
-                    f"Error: the page layout of the two paragraphs to be merged is the same. This is not expected.\nParagraph ending on page number {page_number} has page layout {repr(ill_ending_paragraph.page_layout)}\nParagraph starting on page number {next_page_number} has page layout {repr(ill_starting_paragraph.page_layout)}"
-                )
+            self._merge_across_page_break(
+                ill_ending_paragraph,
+                ill_starting_paragraph,
+                page_number,
+                next_page_number,
+            )
 
-            # Check parent types match
-            if type(ill_starting_paragraph._owning_hierarchical_level) is not type(
-                ill_ending_paragraph._owning_hierarchical_level
+    def _merge_across_page_break(
+        self,
+        ill_ending_paragraph: Paragraph,
+        ill_starting_paragraph: Paragraph,
+        page_number: int,
+        next_page_number: int,
+    ) -> None:
+        """Merge the two halves (paragraphs or blockquotes) of an element that
+        was cut by a page break, unless they do not share the same parent."""
+        # Assert that the page_layout of the two paragraphs do differ
+        if ill_ending_paragraph.page_layout == ill_starting_paragraph.page_layout:
+            raise ConverterError(
+                f"Error: the page layout of the two paragraphs to be merged is the same. This is not expected.\nParagraph ending on page number {page_number} has page layout {repr(ill_ending_paragraph.page_layout)}\nParagraph starting on page number {next_page_number} has page layout {repr(ill_starting_paragraph.page_layout)}"
+            )
+
+        last_sentence_of_ill_ending_paragraph = ill_ending_paragraph.get_sentences()[-1]
+
+        # Check parent types match
+        if type(ill_starting_paragraph._owning_hierarchical_level) is not type(
+            ill_ending_paragraph._owning_hierarchical_level
+        ):
+            self._diagnostics.warn(
+                f"Choosing not to merge the paragraph ending page {ill_ending_paragraph.page_layout.page_number} "
+                f"(ends with: {last_sentence_of_ill_ending_paragraph.text[-60:]!r}) and the paragraph starting page "
+                f"{ill_starting_paragraph.page_layout.page_number} "
+                f"(starts with: {ill_starting_paragraph.get_sentences()[0].text[:60]!r}), because"
+            )
+            self._diagnostics.warn("their respective parents are of different types: ")
+            self._diagnostics.warn(
+                f"which are respectively {type(ill_starting_paragraph._owning_hierarchical_level)} and {type(ill_ending_paragraph._owning_hierarchical_level)}."
+            )
+            return
+
+        # Check same hierarchical parent
+        if (
+            ill_starting_paragraph._owning_hierarchical_level
+            != ill_ending_paragraph._owning_hierarchical_level
+        ):
+            self._diagnostics.warn(
+                f"Choosing not to merge the paragraph ending page {ill_ending_paragraph.page_layout.page_number} "
+                f"(ends with: {last_sentence_of_ill_ending_paragraph.text[-60:]!r}) and the paragraph starting page "
+                f"{ill_starting_paragraph.page_layout.page_number} "
+                f"(starts with: {ill_starting_paragraph.get_sentences()[0].text[:60]!r}), because they are not siblings."
+            )
+            return
+
+        # Proceed with the merging
+        first_sentence_of_ill_starting_paragraph = (
+            ill_starting_paragraph.get_sentences()[0]
+        )
+        # First merge the two sentences:
+        last_sentence_of_ill_ending_paragraph.append(
+            first_sentence_of_ill_starting_paragraph
+        )
+        ill_starting_paragraph.remove_sentence(first_sentence_of_ill_starting_paragraph)
+        # Then merge the two paragraphs:
+        ill_ending_paragraph.merge(ill_starting_paragraph)
+
+    def _page_requires_blockquote_continuation(self, page_number: int) -> bool:
+        if page_number not in self.structural_info.pages_info:
+            return True
+        if "blockquote_fits_on_page" in self.structural_info.pages_info[page_number]:
+            return False
+        return True
+
+    def _chapter_get_first_element_of_given_page(
+        self, chapter, page_number: int
+    ) -> Paragraph | None:
+        """First paragraph or blockquote of the page, whatever its kind."""
+        for sublevel in chapter.get_sublevels() or []:
+            if isinstance(
+                sublevel, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)
             ):
-                self._diagnostics.warn(
-                    f"Choosing not to merge the paragraph ending page {ill_ending_paragraph.page_layout.page_number} "
-                    f"(ends with: {last_sentence_of_ill_ending_paragraph.text[-60:]!r}) and the paragraph starting page "
-                    f"{ill_starting_paragraph.page_layout.page_number} "
-                    f"(starts with: {ill_starting_paragraph.get_sentences()[0].text[:60]!r}), because"
+                sublevel_result = self._chapter_get_first_element_of_given_page(
+                    sublevel, page_number
                 )
-                self._diagnostics.warn("their respective parents are of different types: ")
-                self._diagnostics.warn(
-                    f"which are respectively {type(ill_starting_paragraph._owning_hierarchical_level)} and {type(ill_ending_paragraph._owning_hierarchical_level)}."
+                if sublevel_result is not None:
+                    return sublevel_result
+            elif isinstance(sublevel, Paragraph):
+                if sublevel.has_page_number(page_number):
+                    return sublevel
+        return None
+
+    def _chapter_get_last_element_of_given_page(
+        self, chapter, page_number: int
+    ) -> Paragraph | None:
+        """Last paragraph or blockquote of the page, whatever its kind."""
+        element_of_that_page = None
+        for sublevel in chapter.get_sublevels() or []:
+            if isinstance(
+                sublevel, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)
+            ):
+                result = self._chapter_get_last_element_of_given_page(
+                    sublevel, page_number
                 )
+                if result is not None:
+                    element_of_that_page = result
+            elif isinstance(sublevel, Paragraph):
+                if sublevel.has_page_number(page_number):
+                    element_of_that_page = sublevel
+        return element_of_that_page
+
+    def reconstitute_blockquotes_spreading_over_two_pages(
+        self, top_level_chapter
+    ) -> None:
+        """Merge the blockquotes (pull quotes) that were cut by a page break.
+
+        A blockquote ending a page on an unfinished sentence, immediately
+        followed (the pages skipped by the structural info left aside) by a
+        blockquote starting the next page, is the two halves of a single
+        blockquote. A paragraph starting the next page is running text and is
+        never glued to a blockquote. The pages flagged with
+        "blockquote_fits_on_page" are left untouched.
+        """
+        if not isinstance(top_level_chapter, TopLevelChapter):
+            return
+
+        for page_index in range(0, len(top_level_chapter.pages) - 1):
+            page_number = top_level_chapter.pages[page_index].page_number
+            if not self._page_requires_blockquote_continuation(page_number):
+                continue
+            next_page_number = (
+                self.structural_info._get_page_number_finishing_last_paragraph(
+                    page_number
+                )
+            )
+            if self.structural_info._holds_new_chapter(next_page_number):
                 continue
 
-            # Check same hierarchical parent
+            ending_element = self._chapter_get_last_element_of_given_page(
+                top_level_chapter, page_number
+            )
+            if not isinstance(ending_element, BlockQuoteParagraph):
+                continue
+            starting_element = self._chapter_get_first_element_of_given_page(
+                top_level_chapter, next_page_number
+            )
+            if not isinstance(starting_element, BlockQuoteParagraph):
+                continue
             if (
-                ill_starting_paragraph._owning_hierarchical_level
-                != ill_ending_paragraph._owning_hierarchical_level
+                not ending_element.get_sentences()
+                or not starting_element.get_sentences()
             ):
-                self._diagnostics.warn(
-                    f"Choosing not to merge the paragraph ending page {ill_ending_paragraph.page_layout.page_number} "
-                    f"(ends with: {last_sentence_of_ill_ending_paragraph.text[-60:]!r}) and the paragraph starting page "
-                    f"{ill_starting_paragraph.page_layout.page_number} "
-                    f"(starts with: {ill_starting_paragraph.get_sentences()[0].text[:60]!r}), because they are not siblings."
-                )
                 continue
-
-            # Proceed with the merging
-            first_sentence_of_ill_starting_paragraph = (
-                ill_starting_paragraph.get_sentences()[0]
+            # A complete last sentence means two distinct blockquotes.
+            if ending_element.get_sentences()[-1].is_complete():
+                continue
+            self._merge_across_page_break(
+                ending_element, starting_element, page_number, next_page_number
             )
-            # First merge the two sentences:
-            last_sentence_of_ill_ending_paragraph.append(
-                first_sentence_of_ill_starting_paragraph
-            )
-            ill_starting_paragraph.remove_sentence(
-                first_sentence_of_ill_starting_paragraph
-            )
-            # Then merge the two paragraphs:
-            ill_ending_paragraph.merge(ill_starting_paragraph)

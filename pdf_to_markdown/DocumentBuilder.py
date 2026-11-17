@@ -21,6 +21,7 @@ from .LevelBreaker import LevelBreaker
 from .TextSanitizer import TextSanitizer
 from .ParagraphMerger import ParagraphMerger
 from .BlockquoteDeduplicator import BlockquoteDeduplicator
+from .SectionDropper import SectionDropper
 
 nltk.download("punkt_tab", quiet=True)
 
@@ -43,8 +44,15 @@ class DocumentBuilder(TextSanitizer, ABC):
     ) -> None:
         self.document = document
         self.structural_info = structural_info
-        self._diagnostics = diagnostics if diagnostics is not None else DiagnosticsReporter()
-        self._paragraph_merger = ParagraphMerger(structural_info, diagnostics=self._diagnostics)
+        self._diagnostics = (
+            diagnostics if diagnostics is not None else DiagnosticsReporter()
+        )
+        self._paragraph_merger = ParagraphMerger(
+            structural_info, diagnostics=self._diagnostics
+        )
+        self._section_dropper = SectionDropper(
+            structural_info, diagnostics=self._diagnostics
+        )
         self._blockquote_deduplicator = BlockquoteDeduplicator(
             diagnostics=self._diagnostics
         )
@@ -54,8 +62,15 @@ class DocumentBuilder(TextSanitizer, ABC):
         self.break_document_into_chapters()  # Calling the derived version
         for chapter in self.document.get_chapters():
             self.break_level(chapter)
+        # Dropping the sections first prevents a paragraph from being glued to
+        # the text of a dropped section.
+        self._section_dropper.drop_sections(self.document)
         for top_level_chapter in self.document.get_chapters():
             self._paragraph_merger.reconstitute_paragraphs_spreading_over_two_pages(
+                top_level_chapter
+            )
+        for top_level_chapter in self.document.get_chapters():
+            self._paragraph_merger.reconstitute_blockquotes_spreading_over_two_pages(
                 top_level_chapter
             )
         # Once the paragraphs spreading over two pages are reconstituted the
@@ -75,7 +90,7 @@ class DocumentBuilder(TextSanitizer, ABC):
                 "Error: trying to break a paragraph into sentences but "
                 "the paragraph text is None."
             )
-        paragraph_text = paragraph.text
+        paragraph_text = TextSanitizer.normalize_spaced_ellipsis(paragraph.text)
         tokenized_text = nltk.tokenize.sent_tokenize(paragraph_text)
         sanitized_sentences = [
             self._normalize_newlines_and_multiple_whitespaces(

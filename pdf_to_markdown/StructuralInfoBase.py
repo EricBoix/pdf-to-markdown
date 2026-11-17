@@ -20,6 +20,9 @@ class StructuralInfoBase(ABC):
         1: {
             "type": "generic",
             "drop_page": True,              # optional flag to drop content
+            "blockquote_fits_on_page": True,# optional: a blockquote ending
+                                            # this page is not continued on
+                                            # the next one
         },
     }
     """
@@ -44,6 +47,27 @@ class StructuralInfoBase(ABC):
     def total_page_number(self) -> int:
         """Return total number of pages in the PDF document."""
         ...
+
+    @property
+    def dropped_sections(self) -> list[str]:
+        """Titles of the sections (at any depth) to drop from the document.
+
+        Derived classes override this (a class attribute list is enough) with
+        the normalized titles, as produced by
+        TextSanitizer.normalize_chapter_name. The default drops nothing.
+        """
+        return []
+
+    def is_section_dropped(self, section_name: str) -> bool:
+        """Whether a section designated by its normalized title must be dropped.
+
+        The comparison ignores the case.
+        """
+        folded_name = section_name.casefold()
+        return any(
+            folded_name == dropped_section.casefold()
+            for dropped_section in self.dropped_sections
+        )
 
     def __init__(self) -> None:
         # Technical (optimisation) variable used to hold the correspondance

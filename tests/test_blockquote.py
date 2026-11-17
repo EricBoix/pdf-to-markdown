@@ -21,9 +21,7 @@ from pdf_to_markdown import (
 )
 
 PARAGRAPH_BREAKING_PATTERN = "\n   "
-BLOCKQUOTE_PATTERN = (
-    r"(?:\A|\n\n)((?: {4}\S(?:(?! {5})[^\n])*(?:\n|\Z))+)(?=\n|\Z)"
-)
+BLOCKQUOTE_PATTERN = r"(?:\A|\n\n)((?: {4}\S(?:(?! {5})[^\n])*(?:\n|\Z))+)(?=\n|\Z)"
 
 
 class TestParagraphAndBlockquoteSplitter:
@@ -35,7 +33,7 @@ class TestParagraphAndBlockquoteSplitter:
     def test_blockquote_lines_are_kept_together_and_flagged(self):
         splitter = self._splitter()
         text = (
-            "   First paragraph\nover two lines.\n"
+            "First paragraph\nover two lines.\n"
             "\n"
             "    The pull quote starts\n"
             "    and ends here.\n"
@@ -130,15 +128,11 @@ class TestBlockquoteDeduplicator:
         paragraph = _paragraph(
             Paragraph, 1, "It is stable.", "It is clear.", "Indeed, it is deep."
         )
-        blockquote = _paragraph(
-            BlockQuoteParagraph, 1, "It is stable. It is clear."
-        )
+        blockquote = _paragraph(BlockQuoteParagraph, 1, "It is stable. It is clear.")
         assert self._deduplicate(blockquote, paragraph) == [paragraph]
 
     def test_blockquote_repeating_sentences_in_the_middle_is_dropped(self):
-        paragraph = _paragraph(
-            Paragraph, 1, "First one.", "Second one.", "Third one."
-        )
+        paragraph = _paragraph(Paragraph, 1, "First one.", "Second one.", "Third one.")
         blockquote = _paragraph(BlockQuoteParagraph, 1, "Second one.")
         assert self._deduplicate(paragraph, blockquote) == [paragraph]
 
@@ -159,7 +153,9 @@ class TestBlockquoteDeduplicator:
 
     def test_paraphrased_blockquote_is_kept(self):
         paragraph = _paragraph(Paragraph, 1, "The objects of consciousness arise.")
-        blockquote = _paragraph(BlockQuoteParagraph, 1, "Objects of consciousness arise.")
+        blockquote = _paragraph(
+            BlockQuoteParagraph, 1, "Objects of consciousness arise."
+        )
         assert self._deduplicate(paragraph, blockquote) == [paragraph, blockquote]
 
     def test_paragraph_of_previous_and_next_pages_are_in_scope(self):
@@ -206,7 +202,9 @@ class TestParagraphMergerIgnoresBlockquotes:
         chapter = TopLevelChapterOfParagraphs("Chapter")
         for page_number in (1, 2):
             chapter.add_page(
-                ExtractedPage(page_number, PageLayout(page_number + 1, page_number), None)
+                ExtractedPage(
+                    page_number, PageLayout(page_number + 1, page_number), None
+                )
             )
         for paragraph in paragraphs:
             chapter.add_sublevel(paragraph)

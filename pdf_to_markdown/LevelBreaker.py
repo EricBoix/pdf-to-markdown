@@ -63,8 +63,17 @@ class LevelBreaker:
                 self._diagnostics.warn(f"DocumentHierarchicalLevel {self.level} with NO text content.")
 
         current_level = self.level
+        # A sublevel name (e.g. a section title) may be the very last line of
+        # the text of a content (page) while the text it names starts on the
+        # next content. Such a name is then carried over, and prepended to the
+        # text of the next content, in order to be broken like any other name.
+        pending_name_text = ""
         for level_content in contents:
-            content_text = level_content.text
+            content_text = level_content.text or ""
+            if pending_name_text and content_text:
+                # The newline is the one that ended the name on its page.
+                content_text = pending_name_text + "\n" + content_text
+            pending_name_text = ""
             self._diagnostics.debug(f"####### break_into_sublevels, contents: {content_text}")
             if not content_text:
                 self._diagnostics.warn(f"level with NO text.")
@@ -77,6 +86,10 @@ class LevelBreaker:
             while parts:
                 self._diagnostics.debug(f"### break_into_sublevels, ({len(parts)}) parts: {parts}")
 
+                if self._is_trailing_name_only(parts, level_content is contents[-1]):
+                    pending_name_text = parts[0]
+                    break
+
                 new_sublevel, parts = self._try_create_sublevel(new_layout, parts)
                 if new_sublevel:
                     current_level = new_sublevel
@@ -87,6 +100,15 @@ class LevelBreaker:
                 )
                 if should_break:
                     break
+
+    def _is_trailing_name_only(self, parts: list[str], is_last_content: bool) -> bool:
+        """Whether the remaining parts boil down to a sublevel name that has no
+        text yet, and that thus has to be carried over to the next content."""
+        if is_last_content or len(parts) != 1:
+            return False
+        if type(self.sublevel_factory(None)) == Paragraph:
+            return False
+        return bool(self.level_splitter.get_sublevel_name(parts[0]))
 
     def _try_create_sublevel(
         self, new_layout: PageLayout, parts: list[str]

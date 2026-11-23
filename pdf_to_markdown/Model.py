@@ -130,7 +130,9 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         Parent.__init__(self)
         self.name: str = name
         if not self.name:
-            self._logger.warning("DocumentHierarchicalLevel created with no given name.")
+            self._logger.warning(
+                "DocumentHierarchicalLevel created with no given name."
+            )
         # The text capturing this level as extracted from the original document.
         # Note that this text is only used in order to construct this model
         # during the hierarchical breakdown. Eventually all the text content
@@ -236,8 +238,12 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
                 #    to the same SuperChapter)
                 # Although the paragraphs follow themselves, they do not share
                 # the same parent (but the same grand-parent).
-                self._logger.warning(f"Choosing not to merge {self} and {other}, because")
-                self._logger.warning(f"their respective parent are of different types, that")
+                self._logger.warning(
+                    f"Choosing not to merge {self} and {other}, because"
+                )
+                self._logger.warning(
+                    f"their respective parent are of different types, that"
+                )
                 self._logger.warning(
                     f"are {type(self.owning_hierarchical_level)} and {type(other.owning_hierarchical_level)}."
                 )
@@ -270,7 +276,15 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
             # The punctuation legitimately comes from the original document:
             # silence markdownlint (MD026) for this very line only.
             header += self.MARKDOWNLINT_DISABLE_MD026
-        md_file.write("\n" + header)
+        # markdownlint rule MD022 requires a blank line before a header, that
+        # is two newlines. What precedes depends on the previous sibling: a
+        # paragraph does not end with a newline (MdUtils.new_paragraph()
+        # starts with two newlines, but does not end with any) whereas a
+        # level ends with a newline.
+        previous_text = md_file.file_data_text
+        trailing_newlines = len(previous_text) - len(previous_text.rstrip("\n"))
+        missing_newlines = 1 if not previous_text else max(0, 2 - trailing_newlines)
+        md_file.write("\n" * missing_newlines + header)
         if self.sublevels and not isinstance(self.sublevels[0], Paragraph):
             # A sub header (unlike a paragraph) does not start with a blank
             # line of its own: provide the blank line separating the headers.

@@ -7,6 +7,7 @@ from .Model import (
     TopLevelChapter,
 )
 from .DiagnosticsReporter import DiagnosticsReporter
+from .NumberedListAnnotator import NumberedListAnnotator
 from .Errors import ConverterError
 
 
@@ -156,6 +157,14 @@ class ParagraphMerger:
             )
             if last_sentence_of_ill_ending_paragraph.is_complete():
                 continue
+            # The item of a numbered list (e.g. an endnote) starting a page
+            # is not the end of the paragraph above, even when the sentence
+            # of that paragraph is not recognized as complete (e.g. because
+            # it ends with a closing quotation mark).
+            if self._heuristic_starts_next_numbered_list_item(
+                ill_ending_paragraph, ill_starting_paragraph
+            ):
+                continue
 
             self._merge_across_page_break(
                 ill_ending_paragraph,
@@ -163,6 +172,30 @@ class ParagraphMerger:
                 page_number,
                 next_page_number,
             )
+
+    def _heuristic_starts_next_numbered_list_item(
+        self, ill_ending_paragraph: Paragraph, ill_starting_paragraph: Paragraph
+    ) -> bool:
+        """Whether the paragraph starting a page is the next item of a numbered list.
+
+        Heuristic, see NumberedListAnnotator. Assumption: a paragraph that
+        begins with the number following the last item above is an item, not
+        the end of the paragraph cut by the page break. Failure mode: a
+        paragraph really cut right before such a number is left unmerged.
+        Disable: StructuralInfoBase.numbered_list_heuristics_enabled.
+        """
+        if not self.structural_info.numbered_list_heuristics_enabled:
+            return False
+        owner = ill_ending_paragraph._owning_hierarchical_level
+        sibling_texts = []
+        for sibling in owner.get_sublevels():
+            if isinstance(sibling, Paragraph):
+                sibling_texts.append(sibling.get_markdown_text())
+            if sibling is ill_ending_paragraph:
+                break
+        return NumberedListAnnotator().heuristic_is_next_item(
+            sibling_texts, ill_starting_paragraph.get_markdown_text()
+        )
 
     def _merge_across_page_break(
         self,

@@ -16,7 +16,11 @@ for resource, path in [
 import logging
 
 from .Errors import ConverterError
-from .NumberedListAnnotator import NumberedListAnnotator, NumberedListRole
+from .NumberedListAnnotator import (
+    NumberedListAnnotator,
+    NumberedListPlacement,
+    NumberedListRole,
+)
 from .PageLayout import PageLayout
 
 # Type variable for sublevel types in DocumentHierarchicalLevel
@@ -291,22 +295,30 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
             # line of its own: provide the blank line separating the headers.
             md_file.write("\n")
         if self.sublevels:
-            self._annotate_numbered_lists()
+            self._heuristic_annotate_numbered_lists()
             for sublevel in self.sublevels:
                 if sublevel is not None:
                     sublevel.to_markdown(md_file, level + 1)
         md_file.new_line()
 
-    def _annotate_numbered_lists(self) -> None:
-        """Tell each paragraph its role in the numbered lists of this level."""
+    def _heuristic_annotate_numbered_lists(self) -> None:
+        """Tell each paragraph its place in the numbered lists of this level.
+
+        Heuristic, see NumberedListAnnotator. Nothing is done when the
+        document has the numbered list heuristics disabled.
+        """
+        if not getattr(
+            self.hierarchical_toplevel, "numbered_list_heuristics_enabled", True
+        ):
+            return
         paragraph_texts = [
             sublevel.get_markdown_text() if isinstance(sublevel, Paragraph) else None
             for sublevel in self.sublevels
         ]
-        roles = NumberedListAnnotator().annotate(paragraph_texts)
-        for sublevel, role in zip(self.sublevels, roles):
+        placements = NumberedListAnnotator().heuristic_annotate(paragraph_texts)
+        for sublevel, placement in zip(self.sublevels, placements):
             if isinstance(sublevel, Paragraph):
-                sublevel.numbered_list_role = role
+                sublevel.numbered_list_placement = placement
 
 
 class Paragraph(DocumentHierarchicalLevel[Sentence]):
@@ -320,7 +332,7 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
         DocumentHierarchicalLevel.__init__(self, name="Paragraph")
         self.page_layout = layout
         # Set by the owning level when converting to markdown
-        self.numbered_list_role = NumberedListRole.NONE
+        self.numbered_list_placement = NumberedListPlacement()
 
     remove_sentence = DocumentHierarchicalLevel.remove_sublevel
     get_sentences = DocumentHierarchicalLevel.get_sublevels
@@ -367,11 +379,11 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
         return " ".join([sentence.text for sentence in self.get_sublevels()])
 
     def _apply_numbered_list_role(self, text: str) -> str:
-        if self.numbered_list_role == NumberedListRole.CONTINUATION:
-            return NumberedListAnnotator.indent_continuation(text)
-        if self.numbered_list_role == NumberedListRole.ESCAPED_ITEM:
-            return NumberedListAnnotator.escape_item(text)
-        return text
+        if self.numbered_list_placement.role == NumberedListRole.FAILED:
+            return NumberedListAnnotator.annotate_failure(text)
+        return NumberedListAnnotator.indent(
+            text, self.numbered_list_placement.indentation
+        )
 
 
 class BlockQuoteParagraph(Paragraph):
@@ -516,6 +528,8 @@ class DocumentHierarchicalRoot:
     ) -> None:
         self.title = title
         self.publication_info = publication_info
+        # See NumberedListAnnotator (set from the structural information)
+        self.numbered_list_heuristics_enabled = True
 
     def get_title(self) -> str:
         return self.title

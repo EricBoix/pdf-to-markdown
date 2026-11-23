@@ -15,6 +15,7 @@ from .Model import (
     Document,
     PublicationInfo,
 )
+from .NumberedListAnnotator import NumberedListAnnotator, NumberedListRole
 from .ConverterBase import ConverterBase
 from .DocumentBuilder import DocumentBuilder
 from .DocumentBreaker import DocumentBreaker

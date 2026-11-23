@@ -16,6 +16,7 @@ for resource, path in [
 import logging
 
 from .Errors import ConverterError
+from .NumberedListAnnotator import NumberedListAnnotator, NumberedListRole
 from .PageLayout import PageLayout
 
 # Type variable for sublevel types in DocumentHierarchicalLevel
@@ -290,10 +291,22 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
             # line of its own: provide the blank line separating the headers.
             md_file.write("\n")
         if self.sublevels:
+            self._annotate_numbered_lists()
             for sublevel in self.sublevels:
                 if sublevel is not None:
                     sublevel.to_markdown(md_file, level + 1)
         md_file.new_line()
+
+    def _annotate_numbered_lists(self) -> None:
+        """Tell each paragraph its role in the numbered lists of this level."""
+        paragraph_texts = [
+            sublevel.get_markdown_text() if isinstance(sublevel, Paragraph) else None
+            for sublevel in self.sublevels
+        ]
+        roles = NumberedListAnnotator().annotate(paragraph_texts)
+        for sublevel, role in zip(self.sublevels, roles):
+            if isinstance(sublevel, Paragraph):
+                sublevel.numbered_list_role = role
 
 
 class Paragraph(DocumentHierarchicalLevel[Sentence]):
@@ -306,6 +319,8 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
         """A paragraph is a set of sentences"""
         DocumentHierarchicalLevel.__init__(self, name="Paragraph")
         self.page_layout = layout
+        # Set by the owning level when converting to markdown
+        self.numbered_list_role = NumberedListRole.NONE
 
     remove_sentence = DocumentHierarchicalLevel.remove_sublevel
     get_sentences = DocumentHierarchicalLevel.get_sublevels
@@ -345,8 +360,18 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
         # Note: we can not delegate the markdown generation to
         # Sentence.to_markdown() since we would have to use md_file.new_line()
         # which (as expected) adds an unwanted mandatory line break
-        paragraph_as_text = " ".join([sentence.text for sentence in sentences])
-        md_file.new_paragraph(paragraph_as_text)
+        md_file.new_paragraph(self._apply_numbered_list_role(self.get_markdown_text()))
+
+    def get_markdown_text(self) -> str:
+        """The text of the paragraph, as written in markdown (no list role)."""
+        return " ".join([sentence.text for sentence in self.get_sublevels()])
+
+    def _apply_numbered_list_role(self, text: str) -> str:
+        if self.numbered_list_role == NumberedListRole.CONTINUATION:
+            return NumberedListAnnotator.indent_continuation(text)
+        if self.numbered_list_role == NumberedListRole.ESCAPED_ITEM:
+            return NumberedListAnnotator.escape_item(text)
+        return text
 
 
 class BlockQuoteParagraph(Paragraph):
@@ -365,8 +390,10 @@ class BlockQuoteParagraph(Paragraph):
         if not sentences:
             self._logger.warning("Useless blockquote paragraph with no sentences.")
             return
-        paragraph_as_text = " ".join([sentence.text for sentence in sentences])
-        md_file.new_paragraph("> " + paragraph_as_text)
+        md_file.new_paragraph(self._apply_numbered_list_role(self.get_markdown_text()))
+
+    def get_markdown_text(self) -> str:
+        return "> " + Paragraph.get_markdown_text(self)
 
 
 class TopLevelChapter:

@@ -186,4 +186,9 @@ class NumberedListAnnotator:
     @classmethod
     def annotate_failure(cls, text: str) -> str:
         """Append the converter note to an item that fits in no list."""
-        return f"{text} {cls.FAILURE_NOTE}"
+        return text + cls.failure_suffix()
+
+    @classmethod
+    def failure_suffix(cls) -> str:
+        """What annotate_failure appends to the text."""
+        return f" {cls.FAILURE_NOTE}"

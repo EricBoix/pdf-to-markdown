@@ -14,13 +14,17 @@ class ConverterBase(DocumentBuilder):
     chapter, sub-chapter, paragraph...).
     """
 
-    def __init__(self, pdf_filename, document, structural_info) -> None:
+    def __init__(
+        self, pdf_filename, document, structural_info, maximum_line_length=None
+    ) -> None:
         self.pdf_filename = pdf_filename
         diagnostics = DiagnosticsReporter()
         structural_info.set_diagnostics(diagnostics)
         document.numbered_list_heuristics_enabled = (
             structural_info.numbered_list_heuristics_enabled
         )
+        # See LineWrapper (None: the lines of the paragraphs are never broken)
+        document.maximum_line_length = maximum_line_length
         DocumentBuilder.__init__(self, document, structural_info, diagnostics)
         self.build_document()
 

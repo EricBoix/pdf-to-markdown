@@ -21,6 +21,7 @@ from .NumberedListAnnotator import (
     NumberedListPlacement,
     NumberedListRole,
 )
+from .LineWrapper import LineWrapper
 from .ConverterBase import ConverterBase
 from .DocumentBuilder import DocumentBuilder
 from .DocumentBreaker import DocumentBreaker

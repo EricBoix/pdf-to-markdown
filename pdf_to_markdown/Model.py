@@ -21,6 +21,7 @@ from .NumberedListAnnotator import (
     NumberedListPlacement,
     NumberedListRole,
 )
+from .LineWrapper import LineWrapper
 from .PageLayout import PageLayout
 from .TableRegistry import SpanningCellText
 
@@ -373,17 +374,31 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
         # Note: we can not delegate the markdown generation to
         # Sentence.to_markdown() since we would have to use md_file.new_line()
         # which (as expected) adds an unwanted mandatory line break
-        md_file.new_paragraph(self._apply_numbered_list_role(self.get_markdown_text()))
+        md_file.new_paragraph(self._get_markdown_lines())
 
     def get_markdown_text(self) -> str:
         """The text of the paragraph, as written in markdown (no list role)."""
         return " ".join([sentence.text for sentence in self.get_sublevels()])
 
-    def _apply_numbered_list_role(self, text: str) -> str:
-        if self.numbered_list_placement.role == NumberedListRole.FAILED:
-            return NumberedListAnnotator.annotate_failure(text)
-        return NumberedListAnnotator.indent(
-            text, self.numbered_list_placement.indentation
+    # What every line of the paragraph starts with (e.g. "> " of a blockquote)
+    LINE_MARKER = ""
+
+    def _get_markdown_lines(self) -> str:
+        """The paragraph as emitted: list role applied, then lines broken.
+
+        The lines are broken last, once the numbered list role is known (it
+        provides the indentation of the lines and an optional trailing note),
+        at the end of sentences when possible (see LineWrapper). Lines are
+        only separated by a single newline: no new paragraph is introduced.
+        """
+        placement = self.numbered_list_placement
+        failed = placement.role == NumberedListRole.FAILED
+        line_prefix = ("" if failed else " " * placement.indentation) + self.LINE_MARKER
+        return LineWrapper.wrap_sentences(
+            [sentence.text for sentence in self.get_sublevels()],
+            getattr(self.hierarchical_toplevel, "maximum_line_length", None),
+            line_prefix,
+            suffix=NumberedListAnnotator.failure_suffix() if failed else "",
         )
 
 
@@ -395,6 +410,10 @@ class BlockQuoteParagraph(Paragraph):
     ParagraphAndBlockquoteSplitter of the book's structural info.
     """
 
+    # Each broken line must start with the blockquote marker (parsers that
+    # work line by line do not know about "lazy continuation lines").
+    LINE_MARKER = "> "
+
     def __init__(self, layout: PageLayout) -> None:
         Paragraph.__init__(self, layout)
 
@@ -403,7 +422,7 @@ class BlockQuoteParagraph(Paragraph):
         if not sentences:
             self._logger.warning("Useless blockquote paragraph with no sentences.")
             return
-        md_file.new_paragraph(self._apply_numbered_list_role(self.get_markdown_text()))
+        md_file.new_paragraph(self._get_markdown_lines())
 
     def get_markdown_text(self) -> str:
         return "> " + Paragraph.get_markdown_text(self)
@@ -617,6 +636,8 @@ class DocumentHierarchicalRoot:
         self.publication_info = publication_info
         # See NumberedListAnnotator (set from the structural information)
         self.numbered_list_heuristics_enabled = True
+        # See LineWrapper (None: the lines of the paragraphs are never broken)
+        self.maximum_line_length = None
 
     def get_title(self) -> str:
         return self.title

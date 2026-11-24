@@ -4,6 +4,7 @@ from typing import Protocol
 import logging
 
 from .Errors import ConverterError
+from .TablePlaceholder import TablePlaceholder
 
 
 class ChapterSplitter:
@@ -62,6 +63,16 @@ class BlockquoteText(str):
     """
 
 
+class TableText(str):
+    """The text of a part, produced by a splitter, that stands for a table.
+
+    The text is the name of the table, as found in the TablePlaceholder that
+    the TableExtractor left in the text of the page. Like BlockquoteText it is
+    a plain str that carries the information "this part is a table" along
+    with the text, see Splitter.is_table().
+    """
+
+
 class Splitter:
     _logger = logging.getLogger("pdf_to_markdown")
 
@@ -69,6 +80,13 @@ class Splitter:
         """Whether a part returned by split() is a blockquote (and not e.g. a paragraph).
 
         Splitters that do not detect blockquotes never return one.
+        """
+        return False
+
+    def is_table(self, part_text) -> bool:
+        """Whether a part returned by split() stands for a table (and not e.g. a paragraph).
+
+        Splitters that do not detect tables never return one.
         """
         return False
 
@@ -260,7 +278,27 @@ class ParagraphAndBlockquoteSplitter(NameLessSinglePatternSplitter):
     def is_blockquote(self, part_text) -> bool:
         return isinstance(part_text, BlockquoteText)
 
+    def is_table(self, part_text) -> bool:
+        return isinstance(part_text, TableText)
+
     def split(self, content_text) -> list[str]:
+        """Breaks a text into paragraphs, blockquotes and tables.
+
+        The tables are cut out first: each TablePlaceholder (see
+        TableExtractor) is a table part, whatever surrounds it.
+        """
+        parts = []
+        position = 0
+        for table_match in TablePlaceholder.PATTERN.finditer(content_text):
+            parts += self._split_into_paragraphs_and_blockquotes(
+                content_text[position : table_match.start()]
+            )
+            parts.append(TableText(table_match.group("table_name")))
+            position = table_match.end()
+        parts += self._split_into_paragraphs_and_blockquotes(content_text[position:])
+        return parts
+
+    def _split_into_paragraphs_and_blockquotes(self, content_text) -> list[str]:
         parts = []
         position = 0
         for match in self.blockquote_pattern.finditer(content_text):

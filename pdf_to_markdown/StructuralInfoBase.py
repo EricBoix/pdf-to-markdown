@@ -2,6 +2,8 @@ import re
 from abc import ABC, abstractmethod
 from .DiagnosticsReporter import DiagnosticsReporter
 from .Errors import ConverterError
+from .TableDeclaration import TableDeclaration
+from .TableRegistry import TableRegistry
 
 
 class StructuralInfoBase(ABC):
@@ -23,6 +25,12 @@ class StructuralInfoBase(ABC):
             "blockquote_fits_on_page": True,# optional: a blockquote ending
                                             # this page is not continued on
                                             # the next one
+            "table_row_continues": True,    # optional: when a table continues
+                                            # on this page, True forces the
+                                            # merge of its last row of the
+                                            # previous page with its first row
+                                            # on this page, False forbids it
+                                            # (absent: decided by heuristic)
         },
     }
     """
@@ -35,6 +43,7 @@ class StructuralInfoBase(ABC):
     KEY_TYPO_AND_FIX = "typo_and_fix"
     KEY_TYPO = "typo"
     KEY_FIX = "fix"
+    KEY_TABLE_ROW_CONTINUES = "table_row_continues"
 
     @property
     @abstractmethod
@@ -69,6 +78,33 @@ class StructuralInfoBase(ABC):
         """
         return []
 
+    @property
+    def table_declarations(self) -> list[TableDeclaration]:
+        """The tables of the document (see TableDeclaration).
+
+        Derived classes override this with the declarations of their tables.
+        The default declares none, in which case the tables (if any) are left
+        in the running text.
+        """
+        return []
+
+    @property
+    def table_registry(self) -> TableRegistry:
+        """Where the tables cut out of the pages are kept (see TableExtractor)."""
+        if self._table_registry is None:
+            self._table_registry = TableRegistry()
+        return self._table_registry
+
+    def get_table_row_continues(self, page_number) -> bool | None:
+        """The declared decision about the row of a table cut by a page break.
+
+        The page is the one on which the table continues. None when the
+        decision is left to the heuristic of the TableExtractor.
+        """
+        if not page_number in self.pages_info:
+            return None
+        return self.pages_info[page_number].get(self.KEY_TABLE_ROW_CONTINUES)
+
     def is_section_dropped(self, section_name: str) -> bool:
         """Whether a section designated by its normalized title must be dropped.
 
@@ -88,6 +124,7 @@ class StructuralInfoBase(ABC):
         #  - the associated value holds the current chapter number for that key
         self._chapter_page = {}
         self._chapter_splitter_instance = None
+        self._table_registry = None
         self._diagnostics = DiagnosticsReporter()
 
     def set_diagnostics(self, diagnostics: DiagnosticsReporter) -> None:

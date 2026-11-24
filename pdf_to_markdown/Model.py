@@ -22,6 +22,7 @@ from .NumberedListAnnotator import (
     NumberedListRole,
 )
 from .PageLayout import PageLayout
+from .TableRegistry import SpanningCellText
 
 # Type variable for sublevel types in DocumentHierarchicalLevel
 T = TypeVar("T", bound="DocumentHierarchicalLevel | None")
@@ -290,7 +291,7 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         trailing_newlines = len(previous_text) - len(previous_text.rstrip("\n"))
         missing_newlines = 1 if not previous_text else max(0, 2 - trailing_newlines)
         md_file.write("\n" * missing_newlines + header)
-        if self.sublevels and not isinstance(self.sublevels[0], Paragraph):
+        if self.sublevels and not isinstance(self.sublevels[0], (Paragraph, Table)):
             # A sub header (unlike a paragraph) does not start with a blank
             # line of its own: provide the blank line separating the headers.
             md_file.write("\n")
@@ -406,6 +407,92 @@ class BlockQuoteParagraph(Paragraph):
 
     def get_markdown_text(self) -> str:
         return "> " + Paragraph.get_markdown_text(self)
+
+
+class Table(Numbered, Parent):
+    """A table of the original document, a leaf of the hierarchy (like a Sentence).
+
+    Its cells are text: it is not broken into sentences. A table is cut out of
+    the pages by the TableExtractor, following the declarations of the book's
+    structural info.
+    """
+
+    # Markdown has no colspan: the cells that a spanning row leaves aside (and
+    # the cells of the header row that the caption does not use) are filled
+    # with this horizontal line.
+    SEPARATOR_FILLER = "────────────────"
+
+    _logger = logging.getLogger("pdf_to_markdown")
+
+    def __init__(
+        self,
+        layout: PageLayout,
+        name: str,
+        caption: str | None,
+        has_column_headings: bool,
+        rows: list[list[str]],
+    ) -> None:
+        Numbered.__init__(self)
+        Parent.__init__(self)
+        self.name = name
+        self.caption = caption
+        self.has_column_headings = has_column_headings
+        # A row is a list of cell texts. When the table has column headings
+        # the first row is the one of the headings.
+        self.rows = rows
+        self.page_layout = layout
+        # A table has no text of its own, refer to Paragraph.text.
+        self.text = None
+
+    def get_sentences(self) -> None:
+        """A table has no sentences (this is for the callers walking paragraphs)."""
+        return None
+
+    def get_document_reference_long(self) -> str:
+        page_reader = self.page_layout.reader_page_number if self.page_layout else "?"
+        return f"Table {self.name!r} (page {page_reader})"
+
+    def to_markdown(self, md_file: MdUtils, dummy_level) -> None:
+        """Add this table to the given MdUtils object."""
+        if not self.rows:
+            self._logger.warning(f"Useless table {self.name!r} with no rows.")
+            return
+        if self.has_column_headings and self.caption:
+            # A line above the table (not emphasized, which would trigger the
+            # markdownlint rule MD036).
+            md_file.new_paragraph(self.caption)
+        md_file.new_paragraph("\n".join(self.get_markdown_lines()))
+
+    def get_markdown_lines(self) -> list[str]:
+        column_count = max(len(row) for row in self.rows)
+        if self.has_column_headings:
+            header_row = self.rows[0]
+            body_rows = self.rows[1:]
+        else:
+            # Markdown requires a header row: the caption takes that place.
+            header_row = [self.caption or ""] + [self.SEPARATOR_FILLER] * (
+                column_count - 1
+            )
+            body_rows = self.rows
+        delimiter_row = ["---"] * column_count
+        return [
+            self._row_to_markdown(row, column_count)
+            for row in [header_row, delimiter_row] + body_rows
+        ]
+
+    @classmethod
+    def _row_to_markdown(cls, row: list[str], column_count: int) -> str:
+        if row and isinstance(row[0], SpanningCellText):
+            # A row spanning all the columns: markdown has no colspan, see
+            # SEPARATOR_FILLER.
+            row = ["**" + row[0] + "**"] + [cls.SEPARATOR_FILLER] * (column_count - 1)
+        padded_row = row + [""] * (column_count - len(row))
+        # An empty cell is a single whitespace between its pipes (markdownlint
+        # rule MD060, compact style).
+        formatted_cells = [
+            " " + cell.replace("|", "\\|") + " " if cell else " " for cell in padded_row
+        ]
+        return "|" + "|".join(formatted_cells) + "|"
 
 
 class TopLevelChapter:

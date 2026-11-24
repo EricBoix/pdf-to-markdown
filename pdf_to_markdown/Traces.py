@@ -5,6 +5,7 @@ from .Model import (
     SubChapterOfParagraphs,
     SuperChapter,
     Paragraph,
+    Table,
 )
 
 # A set of debugging utilities.
@@ -95,7 +96,7 @@ class PrintDocument:
                     sublevel, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)
                 ):
                     self._print_chapter(sublevel)
-                elif isinstance(sublevel, Paragraph):
+                elif isinstance(sublevel, (Paragraph, Table)):
                     self._print_paragraph_and_sentences(sublevel)
 
     def _print_chapter(self, chapter) -> None:
@@ -119,7 +120,7 @@ class PrintDocument:
             ):
                 self._print_chapter_of_paragraphs(sublevel)
                 continue
-            if isinstance(sublevel, Paragraph):
+            if isinstance(sublevel, (Paragraph, Table)):
                 self._print_paragraph_and_sentences(sublevel)
                 continue
             raise ConverterError(

@@ -3,6 +3,7 @@ from pypdf import PdfReader
 from .ExtractedPage import ExtractedPage
 from .Model import TopLevelChapter
 from .PageLayout import PageLayout
+from .TableExtractor import TableExtractor
 from .TextExtractor import TextExtractor
 from .TextSanitizer import TextSanitizer
 from .DiagnosticsReporter import DiagnosticsReporter
@@ -34,6 +35,12 @@ class DocumentBreaker:
         # Pre-extract all page texts
         text_extractor = TextExtractor(self.reader, structural_info)
         self.extracted_texts = text_extractor.extract_all()
+        self.removed_first_line_indentations = (
+            text_extractor.removed_first_line_indentations
+        )
+        self.table_extractor = TableExtractor(
+            structural_info, diagnostics=self._diagnostics
+        )
 
     def _validate_all_pages(self) -> None:
         """Perform all upfront page validation."""
@@ -99,6 +106,9 @@ class DocumentBreaker:
                 self.reader.pages[page_number],  # Original page
             )
             new_extracted_page.set_text(self.extracted_texts[page_number])
+            new_extracted_page.removed_first_line_indentation = (
+                self.removed_first_line_indentations.get(page_number, 0)
+            )
 
             if not self.chapter_splitter.holds_new_chapter(new_extracted_page):
                 # When the new extracted page is not the beginning of a chapter
@@ -140,8 +150,15 @@ class DocumentBreaker:
                 self.chapter_splitter.extract_chapter_name(
                     new_extracted_page, new_chapter_name
                 )
+                # The first line of the page text is not the first line of the
+                # page anymore.
+                new_extracted_page.removed_first_line_indentation = 0
 
             # We are back to the default flow of treatment
+            # The tables are cut out first: the sanitizing and the typo fixing
+            # of the book are meant for running text.
+            self.table_extractor.extract_tables(new_extracted_page)
             self.structural_info.sanitize_page_text(new_extracted_page)
             self.structural_info.fix_typos(new_extracted_page)
             current_chapter.add_page(new_extracted_page)
+        self.table_extractor.check_all_tables_closed()

@@ -12,6 +12,7 @@ from .Model import (
     Paragraph,
     BlockQuoteParagraph,
     Sentence,
+    Table,
 )
 from .PageLayout import PageLayout
 from .StructuralInfoBase import StructuralInfoBase
@@ -22,6 +23,7 @@ from .TextSanitizer import TextSanitizer
 from .ParagraphMerger import ParagraphMerger
 from .BlockquoteDeduplicator import BlockquoteDeduplicator
 from .SectionDropper import SectionDropper
+from .TableRegistry import SpanningCellText
 
 nltk.download("punkt_tab", quiet=True)
 
@@ -114,6 +116,21 @@ class DocumentBuilder(TextSanitizer, ABC):
             paragraph.add_sublevel(new_sentence)
             paragraph.renumber_sublevels()
 
+    def break_table(self, table: Table) -> None:
+        """A table is not broken into sentences: its cell texts are sanitized."""
+
+        def sanitize_cell(cell_text: str) -> str:
+            sanitized_text = self._normalize_newlines_and_multiple_whitespaces(
+                self.sanitize_characters(cell_text)
+            )
+            if isinstance(cell_text, SpanningCellText):
+                return SpanningCellText(sanitized_text)
+            return sanitized_text
+
+        table.rows = [[sanitize_cell(cell) for cell in row] for row in table.rows]
+        if table.caption:
+            table.caption = sanitize_cell(table.caption)
+
     def break_any_level_chapter_into_paragraphs(
         self, chapter, contents: list[ContentWithLayout] | None = None
     ) -> None:
@@ -125,6 +142,7 @@ class DocumentBuilder(TextSanitizer, ABC):
             break_level_callback=self.break_level,
             break_paragraphs_callback=self.break_any_level_chapter_into_paragraphs,
             diagnostics=self._diagnostics,
+            table_registry=self.structural_info.table_registry,
         )
         breaker.break_into_sublevels(contents)
         chapter.renumber_sublevels()
@@ -150,6 +168,7 @@ class DocumentBuilder(TextSanitizer, ABC):
         LEVEL_HANDLERS = {
             Paragraph: self.break_paragraph_into_sentences,
             BlockQuoteParagraph: self.break_paragraph_into_sentences,
+            Table: self.break_table,
             TopLevelChapterOfParagraphs: self.break_any_level_chapter_into_paragraphs,
             SubChapterOfParagraphs: self.break_any_level_chapter_into_paragraphs,
             SuperChapter: self.break_superchapter_into_chapters,

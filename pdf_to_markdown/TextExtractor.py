@@ -7,6 +7,16 @@ class TextExtractor:
     def __init__(self, reader, structural_info) -> None:
         self.reader = reader
         self.structural_info = structural_info
+        # For each page, the number of whitespaces that were removed from the
+        # indentation of its first line (see ExtractedPage).
+        self.removed_first_line_indentations: dict[int, int] = {}
+
+    @staticmethod
+    def _first_line_indentation(text: str) -> int:
+        for line in text.split("\n"):
+            if line.strip():
+                return len(line) - len(line.lstrip(" "))
+        return 0
 
     def extract_all(self) -> dict[int, str]:
         """
@@ -32,5 +42,10 @@ class TextExtractor:
             # a blockquote starting at the very top of a page).
             extracted_texts[page_number] = (
                 self.structural_info.strip_page_text_leading_whitespace(text)
+            )
+            self.removed_first_line_indentations[page_number] = max(
+                0,
+                self._first_line_indentation(text)
+                - self._first_line_indentation(extracted_texts[page_number]),
             )
         return extracted_texts

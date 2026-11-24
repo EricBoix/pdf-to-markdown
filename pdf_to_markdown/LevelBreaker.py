@@ -5,8 +5,10 @@ from .Model import (
     DocumentHierarchicalLevel,
     SubChapterOfParagraphs,
     Paragraph,
+    Table,
 )
 from .PageLayout import PageLayout
+from .TableRegistry import TableRegistry
 from .TextSanitizer import TextSanitizer
 from .DiagnosticsReporter import DiagnosticsReporter
 from .Errors import ConverterError
@@ -18,6 +20,7 @@ class Splitter(Protocol):
     def split(self, content_text: str) -> list[str]: ...
     def get_sublevel_name(self, content_text: str) -> str | None: ...
     def is_blockquote(self, part_text: str) -> bool: ...
+    def is_table(self, part_text: str) -> bool: ...
 
 
 class ContentWithLayout(Protocol):
@@ -43,6 +46,7 @@ class LevelBreaker:
             [DocumentHierarchicalLevel, list[ContentWithLayout] | None], None
         ],
         diagnostics: DiagnosticsReporter | None = None,
+        table_registry: TableRegistry | None = None,
     ) -> None:
         self.level = level
         self.level_splitter = level_splitter
@@ -50,6 +54,7 @@ class LevelBreaker:
         self.break_level = break_level_callback
         self.break_paragraphs = break_paragraphs_callback
         self._diagnostics = diagnostics if diagnostics is not None else DiagnosticsReporter()
+        self._table_registry = table_registry
 
     def break_into_sublevels(
         self, contents: list[ContentWithLayout] | None = None
@@ -127,6 +132,30 @@ class LevelBreaker:
         self.level.add_sublevel(new_sublevel)
         return new_sublevel, parts[2:]
 
+    def _add_table(
+        self,
+        new_layout: PageLayout,
+        current_level: DocumentHierarchicalLevel,
+        table_name: str,
+    ) -> None:
+        """Add to the current level the table that the splitter found by name."""
+        table_content = (
+            self._table_registry.get(table_name)
+            if self._table_registry is not None
+            else None
+        )
+        if table_content is None:
+            raise ConverterError(f"Table {table_name!r} is unknown to the registry.")
+        table = Table(
+            new_layout,
+            table_content.name,
+            table_content.caption,
+            table_content.has_column_headings,
+            [list(row) for row in table_content.rows],
+        )
+        self.break_level(table)
+        current_level.add_sublevel(table)
+
     def _handle_unbreakable_text(
         self,
         new_layout: PageLayout,
@@ -139,6 +168,9 @@ class LevelBreaker:
         remaining = parts[1:]
 
         if new_sublevel_type == Paragraph:
+            if self.level_splitter.is_table(parts[0]):
+                self._add_table(new_layout, current_level, parts[0])
+                return False, remaining
             if not parts[0].strip():
                 self._diagnostics.warn("Skipping paragraph with empty text.")
                 return False, remaining

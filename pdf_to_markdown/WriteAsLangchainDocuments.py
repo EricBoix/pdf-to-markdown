@@ -4,6 +4,7 @@ from .Model import (
     SubChapterOfParagraphs,
     Paragraph,
     Sentence,
+    Table,
 )
 
 # Warning: implicit dependency towards LangChain's Document class
@@ -73,6 +74,10 @@ class WriteAsLangchainDocuments:
                     continue
                 for sentence in sentences:
                     collected_sentences.append(sentence)
+                continue
+            elif isinstance(sublevel, Table):
+                # A table has no sentences: it is not exported as LangChain
+                # documents (yet).
                 continue
             elif isinstance(
                 sublevel, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)

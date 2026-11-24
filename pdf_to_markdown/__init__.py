@@ -7,6 +7,7 @@ from .Model import (
     Sentence,
     Paragraph,
     BlockQuoteParagraph,
+    Table,
     TopLevelChapterOfParagraphs,
     SubChapterOfParagraphs,
     SuperChapter,
@@ -36,7 +37,13 @@ from .Splitter import (
     NameLessSinglePatternSplitter,
     ParagraphAndBlockquoteSplitter,
     BlockquoteText,
+    TableText,
 )
+from .TableDeclaration import TableDeclaration
+from .TableExtractor import TableExtractor
+from .TableLayoutParser import TableLayoutParser
+from .TablePlaceholder import TablePlaceholder
+from .TableRegistry import SpanningCellText, TableContent, TableRegistry
 from .BlockquoteDeduplicator import BlockquoteDeduplicator
 from .SectionDropper import SectionDropper
 from .PageLayout import PageLayout

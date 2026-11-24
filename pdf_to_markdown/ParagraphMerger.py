@@ -4,6 +4,7 @@ from .Model import (
     BlockQuoteParagraph,
     Paragraph,
     Sentence,
+    Table,
     TopLevelChapter,
 )
 from .DiagnosticsReporter import DiagnosticsReporter
@@ -150,6 +151,13 @@ class ParagraphMerger:
                 continue
             if not ill_ending_paragraph.get_sentences():
                 continue
+            # A table between the two paragraphs interrupts the text flow
+            # (e.g. a sentence announcing the table "... align:" is not
+            # continued by the paragraph commenting the table).
+            if self._table_lies_between(
+                top_level_chapter, ill_ending_paragraph, ill_starting_paragraph
+            ):
+                continue
             # A complete last sentence means there is nothing to continue: not
             # merging is then correct, whatever the hierarchical parents are.
             last_sentence_of_ill_ending_paragraph = (
@@ -172,6 +180,31 @@ class ParagraphMerger:
                 page_number,
                 next_page_number,
             )
+
+    def _leaves_in_reading_order(self, level):
+        """The paragraphs and the tables of a level, whatever their depth."""
+        for sublevel in level.get_sublevels() or []:
+            if isinstance(sublevel, (Paragraph, Table)):
+                yield sublevel
+            elif hasattr(sublevel, "get_sublevels"):
+                yield from self._leaves_in_reading_order(sublevel)
+
+    def _table_lies_between(
+        self,
+        top_level_chapter,
+        ending_paragraph: Paragraph,
+        starting_paragraph: Paragraph,
+    ) -> bool:
+        """Whether a table comes in between two paragraphs (in reading order)."""
+        ending_paragraph_seen = False
+        for leaf in self._leaves_in_reading_order(top_level_chapter):
+            if leaf is starting_paragraph:
+                return False
+            if leaf is ending_paragraph:
+                ending_paragraph_seen = True
+            elif ending_paragraph_seen and isinstance(leaf, Table):
+                return True
+        return False
 
     def _heuristic_starts_next_numbered_list_item(
         self, ill_ending_paragraph: Paragraph, ill_starting_paragraph: Paragraph

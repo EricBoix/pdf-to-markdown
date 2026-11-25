@@ -51,6 +51,22 @@ def test_same_structural_info_converts_twice_with_the_same_result(pdf_path):
 
 def test_tables_of_a_conversion_are_not_left_for_the_next_one(pdf_path):
     structural_info = FixtureStructuralInfo()
-    structural_info.table_registry.add(TableContent("Left over table", None, False))
+    first_converter = FixtureConverter(
+        str(pdf_path), Document("First"), structural_info
+    )
+    first_converter._table_registry.add(
+        TableContent("Table of the first conversion", None, False)
+    )
+    second_converter = FixtureConverter(
+        str(pdf_path), Document("Second"), structural_info
+    )
+    assert second_converter._table_registry.get("Table of the first conversion") is None
+
+
+def test_a_conversion_leaves_nothing_of_itself_on_the_structural_info(pdf_path):
+    structural_info = FixtureStructuralInfo()
+    attributes_before = set(vars(structural_info))
     _convert(pdf_path, structural_info)
-    assert structural_info.table_registry.get("Left over table") is None
+    # Whatever is built lazily from the configuration (caches) is created by
+    # the constructor, a conversion only fills it.
+    assert set(vars(structural_info)) == attributes_before

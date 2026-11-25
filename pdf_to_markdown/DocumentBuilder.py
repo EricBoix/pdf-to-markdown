@@ -23,7 +23,7 @@ from .TextSanitizer import TextSanitizer
 from .ParagraphMerger import ParagraphMerger
 from .BlockquoteDeduplicator import BlockquoteDeduplicator
 from .SectionDropper import SectionDropper
-from .TableRegistry import SpanningCellText
+from .TableRegistry import SpanningCellText, TableRegistry
 
 
 class ContentWithLayout(Protocol):
@@ -45,6 +45,9 @@ class DocumentBuilder(TextSanitizer, ABC):
         self.document = document
         self.structural_info = structural_info
         self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
+        # The tables cut out of the pages while this document is built: they
+        # belong to this document only, not to the structural information.
+        self._table_registry = TableRegistry()
         self._paragraph_merger = ParagraphMerger(
             structural_info, diagnostics=self._diagnostics
         )
@@ -138,7 +141,7 @@ class DocumentBuilder(TextSanitizer, ABC):
             break_level_callback=self.break_level,
             break_paragraphs_callback=self.break_any_level_chapter_into_paragraphs,
             diagnostics=self._diagnostics,
-            table_registry=self.structural_info.table_registry,
+            table_registry=self._table_registry,
         )
         breaker.break_into_sublevels(contents)
         chapter.renumber_sublevels()

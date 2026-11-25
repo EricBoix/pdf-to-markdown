@@ -13,6 +13,14 @@ class ExtractedPage:
         indentation of the first line of the page text. A table starting at
         the very top of a page needs them back in order to align its first
         line with the other ones.
+    chapter_name: str | None
+        The (normalized) name of the chapter that the page belongs to.
+    chapter_page_number: int | None
+        The page number of the page opening the chapter that the page belongs
+        to (the very page for a page opening a chapter). Both are set by the
+        DocumentBreaker before the text of the page is treated (tables cut
+        out, sanitized, typos fixed), hence the hooks of a StructuralInfo
+        know the chapter of the page they are given.
 
     Note: Chapter detection and extraction is handled by chapter_splitter
     classes defined in each book's StructuralInfo.
@@ -24,6 +32,8 @@ class ExtractedPage:
         self.original_pdf_page = original_page
         self.text = None
         self.removed_first_line_indentation = 0
+        self.chapter_name = None
+        self.chapter_page_number = None
 
     def set_text(self, text_in) -> None:
         self.text = text_in

@@ -18,7 +18,6 @@ class ConverterBase(DocumentBuilder):
     ) -> None:
         self.pdf_filename = pdf_filename
         diagnostics = DiagnosticsReporter()
-        structural_info.begin_conversion(diagnostics)
         document.numbered_list_heuristics_enabled = (
             structural_info.numbered_list_heuristics_enabled
         )
@@ -35,6 +34,7 @@ class ConverterBase(DocumentBuilder):
             self.pdf_filename,
             self.document,
             self.structural_info,
+            self._table_registry,
             diagnostics=self._diagnostics,
         )
         document_breaker.break_document_into_chapters(ChapterDerived)

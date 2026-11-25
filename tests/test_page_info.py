@@ -144,12 +144,20 @@ class TestStructuralInfoBasePageInfo:
         assert structural_info._forbids_new_chapter(3)
         assert not structural_info._forbids_new_chapter(2)
 
-    def test_chapter_name_is_the_one_of_the_chapter_page(self):
+    def test_chapter_name_and_info_are_the_ones_declared_by_the_chapter_page(self):
         structural_info = _DeclaringStructuralInfo(
-            {2: {"type": "chapter", "chapter_info": {"name": "Two"}}}
+            {
+                2: {
+                    "type": "chapter",
+                    "chapter_info": {"name": "Two", "illumination_delimiter": "W"},
+                }
+            }
         )
-        structural_info.set_chapter_page_number(3, 2)
-        assert structural_info._get_chapter_name(3) == "Two"
+        assert structural_info._get_chapter_name(2) == "Two"
+        assert structural_info._get_chapter_info(2) == {
+            "name": "Two",
+            "illumination_delimiter": "W",
+        }
 
     def test_a_wrong_declaration_fails_whichever_page_is_asked_for(self):
         structural_info = _DeclaringStructuralInfo({4: {"drop_pages": True}})

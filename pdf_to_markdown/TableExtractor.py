@@ -4,7 +4,7 @@ from .DiagnosticsReporter import DiagnosticsReporter
 from .TableDeclaration import TableDeclaration
 from .TableLayoutParser import TableLayoutParser
 from .TablePlaceholder import TablePlaceholder
-from .TableRegistry import SpanningCellText, TableContent
+from .TableRegistry import SpanningCellText, TableContent, TableRegistry
 
 
 class _OpenTable:
@@ -22,19 +22,22 @@ class TableExtractor:
     is replaced, in the text of the page on which the table starts, by a
     TablePlaceholder line. The text of the table, on the pages it spreads
     over, is removed from the text of those pages. The cells of the table are
-    kept in the TableRegistry of the structural information.
+    kept in the given TableRegistry.
 
     Nothing is done (the text of the pages is left untouched) as long as the
     structural information does not declare tables.
     """
 
     def __init__(
-        self, structural_info, diagnostics: DiagnosticsReporter | None = None
+        self,
+        structural_info,
+        table_registry: TableRegistry,
+        diagnostics: DiagnosticsReporter | None = None,
     ) -> None:
         self._structural_info = structural_info
         self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
         self._declarations = structural_info.table_declarations
-        self._registry = structural_info.table_registry
+        self._registry = table_registry
         self._parser = TableLayoutParser(self._diagnostics)
         self._started_table_names: set[str] = set()
         self._open_table: _OpenTable | None = None

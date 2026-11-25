@@ -4,8 +4,10 @@ from .ExtractedPage import ExtractedPage
 from .Model import TopLevelChapter
 from .PageLayout import PageLayout
 from .TableExtractor import TableExtractor
+from .TableRegistry import TableRegistry
 from .TextExtractor import TextExtractor
 from .TextSanitizer import TextSanitizer
+from .TypoFixer import TypoFixer
 from .DiagnosticsReporter import DiagnosticsReporter
 from .Errors import ConverterError
 
@@ -14,6 +16,8 @@ class DocumentBreaker:
     """
     Breaks a PDF document into chapters by iterating over pages.
     Handles PDF reading, text extraction, and chapter breaking.
+
+    The tables cut out of the pages are kept in the given table registry.
     """
 
     def __init__(
@@ -21,6 +25,7 @@ class DocumentBreaker:
         pdf_filename,
         document,
         structural_info,
+        table_registry: TableRegistry,
         diagnostics: DiagnosticsReporter | None = None,
     ) -> None:
         self.document = document
@@ -39,8 +44,9 @@ class DocumentBreaker:
             text_extractor.removed_first_line_indentations
         )
         self.table_extractor = TableExtractor(
-            structural_info, diagnostics=self._diagnostics
+            structural_info, table_registry, diagnostics=self._diagnostics
         )
+        self.typo_fixer = TypoFixer(self._diagnostics)
 
     def _validate_all_pages(self) -> None:
         """Perform all upfront page validation."""
@@ -80,6 +86,9 @@ class DocumentBreaker:
         ChapterDerived: type[TopLevelChapter] = None,
     ) -> None:
         current_chapter = None
+        # The page number of the page that opened the current chapter (the
+        # page layout of a chapter is only known once its first page is added)
+        current_chapter_page_number = None
         for page_number in range(0, self.structural_info.total_page_number):
 
             if self.structural_info._page_is_dropped(page_number):
@@ -111,18 +120,10 @@ class DocumentBreaker:
                     raise ConverterError(
                         f"Any chapter must start with...a chapter typed page.\nNote: we didn't encounter the first chapter yet.\nThis was the content of the extracted page: {new_extracted_page}"
                     )
-                self.structural_info.set_chapter_page_number(
-                    new_extracted_page.page_number,
-                    current_chapter.page_layout.page_number,
-                )
             else:
                 # This new extracted page is the one of a new chapter. We must
                 # thus create it (a Chapter object) as such and define this new
                 # Chapter as the current_chapter:
-                self.structural_info.set_chapter_page_number(
-                    new_extracted_page.page_number,
-                    new_extracted_page.page_number,
-                )
                 new_chapter_name = self.chapter_splitter.get_chapter_name(
                     new_extracted_page
                 )
@@ -135,6 +136,7 @@ class DocumentBreaker:
                     new_chapter_name
                 )
                 current_chapter = ChapterDerived(sanitized_new_chapter_name)
+                current_chapter_page_number = new_extracted_page.page_number
                 self.document.add_chapter(current_chapter)
                 # Remove chapter name from page text
                 self.chapter_splitter.extract_chapter_name(
@@ -145,10 +147,18 @@ class DocumentBreaker:
                 new_extracted_page.removed_first_line_indentation = 0
 
             # We are back to the default flow of treatment
+            # The page knows its chapter before its text is treated (the
+            # sanitizing of a book may depend on it, e.g. to expect the header
+            # of the page)
+            new_extracted_page.chapter_name = current_chapter.name
+            new_extracted_page.chapter_page_number = current_chapter_page_number
             # The tables are cut out first: the sanitizing and the typo fixing
             # of the book are meant for running text.
             self.table_extractor.extract_tables(new_extracted_page)
             self.structural_info.sanitize_page_text(new_extracted_page)
-            self.structural_info.fix_typos(new_extracted_page)
+            typo_fixes = self.structural_info.page_info(
+                new_extracted_page.page_number
+            ).typo_fixes
+            self.typo_fixer.fix(new_extracted_page, typo_fixes)
             current_chapter.add_page(new_extracted_page)
         self.table_extractor.check_all_tables_closed()

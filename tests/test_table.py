@@ -22,6 +22,7 @@ from pdf_to_markdown import (
     Table,
     TableDeclaration,
     TableExtractor,
+    TableRegistry,
     TableLayoutParser,
     TablePlaceholder,
     TableText,
@@ -96,6 +97,8 @@ class StructuralInfoWithTables(StructuralInfoBase):
     def __init__(self, declarations, pages_info=None):
         StructuralInfoBase.__init__(self)
         self._declarations = declarations
+        # What the tests give to their TableExtractor and read the tables from
+        self.table_registry = TableRegistry()
         self._pages_info = pages_info or {}
 
     @property
@@ -169,14 +172,14 @@ class TestTableLayoutParser:
 
 class TestTableExtractor:
     def test_nothing_is_done_without_declared_table(self):
-        extractor = TableExtractor(StructuralInfoWithTables([]))
+        extractor = TableExtractor(StructuralInfoWithTables([]), TableRegistry())
         page = make_page(1, FREE_FORM_PAGE)
         extractor.extract_tables(page)
         assert page.text == FREE_FORM_PAGE
 
     def test_table_is_replaced_by_a_placeholder_and_kept_in_the_registry(self):
         structural_info = StructuralInfoWithTables([free_form_declaration()])
-        extractor = TableExtractor(structural_info)
+        extractor = TableExtractor(structural_info, structural_info.table_registry)
         page = make_page(1, FREE_FORM_PAGE)
         extractor.extract_tables(page)
         assert page.text == (
@@ -196,7 +199,7 @@ class TestTableExtractor:
             [hindrances_declaration()],
             {2: {}},
         )
-        extractor = TableExtractor(structural_info)
+        extractor = TableExtractor(structural_info, structural_info.table_registry)
         first_page = make_page(1, HINDRANCES_FIRST_PAGE)
         second_page = make_page(2, HINDRANCES_SECOND_PAGE)
         extractor.extract_tables(first_page)
@@ -227,7 +230,7 @@ class TestTableExtractor:
             [hindrances_declaration()],
             {2: {StructuralInfoBase.KEY_TABLE_ROW_CONTINUES: False}},
         )
-        extractor = TableExtractor(structural_info)
+        extractor = TableExtractor(structural_info, structural_info.table_registry)
         extractor.extract_tables(make_page(1, HINDRANCES_FIRST_PAGE))
         extractor.extract_tables(make_page(2, HINDRANCES_SECOND_PAGE))
         content = structural_info.table_registry.get("TABLE 4")
@@ -235,7 +238,7 @@ class TestTableExtractor:
 
     def test_first_line_indentation_removed_by_the_extraction_is_restored(self):
         structural_info = StructuralInfoWithTables([hindrances_declaration()])
-        extractor = TableExtractor(structural_info)
+        extractor = TableExtractor(structural_info, structural_info.table_registry)
         extractor.extract_tables(make_page(1, HINDRANCES_FIRST_PAGE))
         stripped_text = HINDRANCES_SECOND_PAGE.lstrip()
         extractor.extract_tables(make_page(2, stripped_text, 3))
@@ -244,7 +247,7 @@ class TestTableExtractor:
 
     def test_unclosed_table_is_reported(self, caplog):
         structural_info = StructuralInfoWithTables([hindrances_declaration()])
-        extractor = TableExtractor(structural_info)
+        extractor = TableExtractor(structural_info, structural_info.table_registry)
         extractor.extract_tables(make_page(1, HINDRANCES_FIRST_PAGE))
         with caplog.at_level("WARNING", logger="pdf_to_markdown"):
             extractor.check_all_tables_closed()
@@ -450,7 +453,7 @@ def stages_declaration():
 class TestTableWithSpanningLabelsAndRows:
     def _read(self, caplog):
         structural_info = StructuralInfoWithTables([stages_declaration()])
-        extractor = TableExtractor(structural_info)
+        extractor = TableExtractor(structural_info, structural_info.table_registry)
         extractor.extract_tables(make_page(1, STAGES_FIRST_PAGE))
         extractor.extract_tables(make_page(2, STAGES_SECOND_PAGE.lstrip(), 26))
         extractor.check_all_tables_closed()

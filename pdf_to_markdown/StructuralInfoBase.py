@@ -1,10 +1,6 @@
-import re
 from abc import ABC, abstractmethod
-from .DiagnosticsReporter import DiagnosticsReporter
-from .Errors import ConverterError
 from .PageInfo import PageInfo
 from .TableDeclaration import TableDeclaration
-from .TableRegistry import TableRegistry
 
 
 class StructuralInfoBase(ABC):
@@ -111,13 +107,6 @@ class StructuralInfoBase(ABC):
         """
         return []
 
-    @property
-    def table_registry(self) -> TableRegistry:
-        """Where the tables cut out of the pages are kept (see TableExtractor)."""
-        if self._table_registry is None:
-            self._table_registry = TableRegistry()
-        return self._table_registry
-
     def page_info(self, page_number) -> PageInfo:
         """The checked declaration of a page (see PageInfo).
 
@@ -154,29 +143,18 @@ class StructuralInfoBase(ABC):
         )
 
     def __init__(self) -> None:
-        # Technical (optimisation) variable used to hold the correspondance
-        # between a given page number and the chapter to which that page
-        # belongs to. In other terms, within this dictionary
-        #  - a key is a page number
-        #  - the associated value holds the current chapter number for that key
-        self._chapter_page = {}
+        # A StructuralInfo is configuration only: it is the same from one
+        # conversion to the next and holds nothing that a conversion produces.
+        # (The correspondance between a given page number and the chapter to
+        # which that page belongs used to be held here, as a technical
+        # variable. It now stands on the extracted page itself, see
+        # ExtractedPage.chapter_name and ExtractedPage.chapter_page_number. The
+        # tables cut out of the pages are kept by the converter.)
+        # What follows are caches of values derived from the configuration,
+        # built on demand:
         self._chapter_splitter_instance = None
-        self._table_registry = None
-        # Lazily built by page_info()
+        # See page_info()
         self._page_infos = None
-        self._diagnostics = DiagnosticsReporter()
-
-    def begin_conversion(self, diagnostics: DiagnosticsReporter) -> None:
-        """Start a conversion: what a previous conversion left behind is forgotten.
-
-        Besides the diagnostics of the conversion, the run state of this
-        instance is the chapter of each page (see set_chapter_page_number) and
-        the tables cut out of the pages (see table_registry). The rest is
-        configuration, the same from one conversion to the next.
-        """
-        self._chapter_page = {}
-        self._table_registry = None
-        self._diagnostics = diagnostics
 
     def get_chapter_splitter(self):
         """Get or create the chapter splitter for this document.
@@ -187,20 +165,6 @@ class StructuralInfoBase(ABC):
             self._chapter_splitter_instance = self.chapter_splitter(self)
         return self._chapter_splitter_instance
 
-    def set_chapter_page_number(
-        self, page_number: int, chapter_page_number: int
-    ) -> None:
-        """Set the chapter page number of the page designated by page number.
-
-        :param int page_number: The page number of the page for which we are setting the chapter (page)
-        :param int chapter_page_number The page number of the chapter (beginning) to which the designated belongs to.
-        """
-        if page_number in self._chapter_page:
-            raise ConverterError(
-                f"Trying to overwrite chapter page of page number {page_number}."
-            )
-        self._chapter_page[page_number] = chapter_page_number
-
     def _page_is_dropped(self, page_number) -> bool:
         return self.page_info(page_number).drop_page
 
@@ -210,21 +174,13 @@ class StructuralInfoBase(ABC):
         """
         return self._page_is_dropped(page_number)
 
-    def _get_chapter_page_number(self, page_number) -> int:
-        if page_number not in self._chapter_page:
-            raise ConverterError(f"Unknown chapter page of page number {page_number}.")
-        return self._chapter_page[page_number]
+    def _get_chapter_info(self, chapter_page_number) -> dict:
+        """The raw chapter_info declared by the page that opens a chapter (the
+        page itself for a page that does open one, see ExtractedPage)."""
+        return self.pages_info[chapter_page_number][self.KEY_CHAPTER_INFO]
 
-    def _get_chapter_page(self, page_number) -> dict:
-        chapter_page_number = self._get_chapter_page_number(page_number)
-        return self.pages_info[chapter_page_number]
-
-    def _get_chapter_info(self, page_number) -> dict:
-        chapter_page = self._get_chapter_page(page_number)
-        return chapter_page[self.KEY_CHAPTER_INFO]
-
-    def _get_chapter_name(self, page_number) -> str | None:
-        chapter_page_number = self._get_chapter_page_number(page_number)
+    def _get_chapter_name(self, chapter_page_number) -> str | None:
+        """The name declared by the page that opens a chapter."""
         return self.page_info(chapter_page_number).chapter_name
 
     def _forbids_new_chapter(self, page_number) -> bool:
@@ -234,24 +190,6 @@ class StructuralInfoBase(ABC):
 
     def _holds_new_chapter(self, page_number) -> bool:
         return self.page_info(page_number).is_chapter
-
-    def fix_typos(self, extracted_page) -> None:
-        """Apply typo fixes on extracted pages that require it."""
-        page_number = extracted_page.page_number
-        for typo_fix in self.page_info(page_number).typo_fixes:
-            typo = typo_fix.typo
-            fixed_text, substitution_count = re.subn(
-                typo, typo_fix.fix, extracted_page.text
-            )
-            if substitution_count == 0:
-                self._diagnostics.warn(
-                    f"Couldn't find typo in extracted page number {page_number}:"
-                )
-                self._diagnostics.warn(f"  - typo: {typo}")
-                self._diagnostics.warn(f"  - page text: {extracted_page.text}")
-                continue
-            extracted_page.text = fixed_text
-            self._diagnostics.debug(f"Typo fixed on page {page_number}")
 
     def _get_page_number_finishing_last_paragraph(self, page_number) -> int:
         """

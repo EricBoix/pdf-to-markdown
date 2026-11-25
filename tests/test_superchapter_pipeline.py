@@ -68,6 +68,18 @@ def test_sub_chapters_are_broken_into_sentences(superchapter_document):
     assert [sentence.text for sentence in _sentences_of(gamma)] == ["Gamma sentence."]
 
 
+def test_each_page_knows_its_super_chapter(superchapter_document):
+    first_part, second_part = superchapter_document.get_chapters()
+    assert [
+        (page.page_number, page.chapter_name, page.chapter_page_number)
+        for page in first_part.pages
+    ] == [(0, "Part One", 0), (1, "Part One", 0), (2, "Part One", 0)]
+    assert [
+        (page.page_number, page.chapter_name, page.chapter_page_number)
+        for page in second_part.pages
+    ] == [(3, "Part Two", 3), (4, "Part Two", 3)]
+
+
 def test_sentences_keep_the_pdf_page_index_they_come_from(superchapter_document):
     first_part, second_part = superchapter_document.get_chapters()
     alpha, beta = first_part.get_sublevels()

@@ -100,9 +100,6 @@ class TestNumberedListAnnotator:
             ITEM,
         ]
 
-    def test_indent_helper(self):
-        assert NumberedListAnnotator.indent("a. Sit", 3) == "   a. Sit"
-
 
 TABLE = NumberedListAnnotator.TABLE_SIBLING
 

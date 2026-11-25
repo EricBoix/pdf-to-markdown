@@ -205,11 +205,6 @@ class NumberedListAnnotator:
                 return item_number == preceding_number + 1
         return False
 
-    @staticmethod
-    def indent(text: str, indentation: int) -> str:
-        """Indent the text so it belongs to the numbered list item above."""
-        return " " * indentation + text
-
     @classmethod
     def annotate_failure(cls, text: str) -> str:
         """Append the converter note to an item that fits in no list."""

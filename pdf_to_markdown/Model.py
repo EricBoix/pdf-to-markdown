@@ -183,6 +183,24 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
     def get_sublevels(self) -> list[T] | None:
         return self.sublevels
 
+    def leaves_in_reading_order(self):
+        """The paragraphs (the blockquotes among them), tables and headings
+        under this level, whatever their depth, in reading order.
+
+        A level with no sublevel has no leaf.
+        """
+        for sublevel in self.get_sublevels() or []:
+            if isinstance(sublevel, (Paragraph, Table, Heading)):
+                yield sublevel
+            elif isinstance(sublevel, DocumentHierarchicalLevel):
+                yield from sublevel.leaves_in_reading_order()
+            else:
+                raise ConverterError(
+                    f"{type(sublevel).__name__} found among the sublevels of "
+                    f"{self.name!r}: expected a level or a leaf (a Paragraph, a "
+                    "Table or a Heading)."
+                )
+
     def set_name(self, name: str) -> None:
         self.name = name
 

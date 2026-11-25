@@ -49,13 +49,11 @@ class BlockquoteDeduplicator:
         return re.sub(r"\s+", "", TextSanitizer.sanitize_characters(text))
 
     def _collect_paragraphs(self, level: DocumentHierarchicalLevel) -> list[Paragraph]:
-        paragraphs = []
-        for sublevel in level.get_sublevels() or []:
-            if isinstance(sublevel, Paragraph):
-                paragraphs.append(sublevel)
-            elif isinstance(sublevel, DocumentHierarchicalLevel):
-                paragraphs += self._collect_paragraphs(sublevel)
-        return paragraphs
+        return [
+            leaf
+            for leaf in level.leaves_in_reading_order()
+            if isinstance(leaf, Paragraph)
+        ]
 
     @staticmethod
     def _get_page_numbers(paragraph: Paragraph) -> set[int]:

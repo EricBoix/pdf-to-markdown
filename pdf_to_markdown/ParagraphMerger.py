@@ -1,9 +1,6 @@
 from .Model import (
-    TopLevelChapterOfParagraphs,
-    SubChapterOfParagraphs,
     BlockQuoteParagraph,
     Paragraph,
-    Sentence,
     Table,
     Heading,
     TopLevelChapter,
@@ -42,50 +39,62 @@ class ParagraphMerger:
         # ambitious but let's try it)
         return not self.structural_info.page_info(page_number).paragraph_fits_on_page
 
-    def _chapter_get_first_paragraph_of_given_page(
-        self, chapter, page_number: int
-    ) -> Paragraph | None:
-        for sublevel in chapter.get_sublevels():
-            if isinstance(
-                sublevel, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)
-            ):
-                sublevel_result = self._chapter_get_first_paragraph_of_given_page(
-                    sublevel, page_number
-                )
-                if sublevel_result is None:
-                    continue
-                return sublevel_result
-            if isinstance(sublevel, Sentence):
-                raise ConverterError("We should have crossed a Paragraph before.")
-            if isinstance(sublevel, BlockQuoteParagraph):
-                continue  # Not part of the text flow, see class documentation
-            if isinstance(sublevel, Paragraph):
-                if sublevel.has_page_number(page_number):
-                    return sublevel
-        return None
+    def _page_requires_blockquote_continuation(self, page_number: int) -> bool:
+        return not self.structural_info.page_info(page_number).blockquote_fits_on_page
 
-    def _chapter_get_last_paragraph_of_given_page(
-        self, chapter, page_number: int
-    ) -> Paragraph | None:
-        sublevel_of_that_page = None
-        for sublevel in chapter.get_sublevels():
-            if isinstance(
-                sublevel, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)
-            ):
-                result = self._chapter_get_last_paragraph_of_given_page(
-                    sublevel, page_number
+    def _page_breaks_to_mend(self, top_level_chapter, page_requires_continuation):
+        """The page breaks of a top level chapter that may have cut an element
+        in two, in order, as (page number, number of the page that continues it).
+
+        A page that does not require a continuation (it is flagged as such by
+        the structural info) opens no page break, and neither does a page
+        followed by a new chapter. The pages that the structural info skips are
+        left aside: the page that continues is the first one not skipped.
+        """
+        if not isinstance(top_level_chapter, TopLevelChapter):
+            return
+        for page_index in range(0, len(top_level_chapter.pages) - 1):
+            page_number = top_level_chapter.pages[page_index].page_number
+            if not page_requires_continuation(page_number):
+                continue
+            next_page_number = (
+                self.structural_info._get_page_number_finishing_last_paragraph(
+                    page_number
                 )
-                if result is not None and result.has_page_number(page_number):
-                    sublevel_of_that_page = result
-                    continue
-            if isinstance(sublevel, Sentence):
-                raise ConverterError("We should have crossed a Paragraph before.")
-            if isinstance(sublevel, BlockQuoteParagraph):
-                continue  # Not part of the text flow, see class documentation
-            if isinstance(sublevel, Paragraph):
-                if sublevel.has_page_number(page_number):
-                    sublevel_of_that_page = sublevel
-        return sublevel_of_that_page
+            )
+            if self.structural_info._holds_new_chapter(next_page_number):
+                continue
+            yield page_number, next_page_number
+
+    @staticmethod
+    def _paragraphs_of_page(
+        top_level_chapter, page_number: int, blockquotes_included: bool
+    ) -> list[Paragraph]:
+        """The paragraphs lying on a page, in reading order. The blockquotes are
+        no part of the text flow (see class documentation) unless asked for."""
+        return [
+            leaf
+            for leaf in top_level_chapter.leaves_in_reading_order()
+            if isinstance(leaf, Paragraph)
+            and (blockquotes_included or not isinstance(leaf, BlockQuoteParagraph))
+            and leaf.has_page_number(page_number)
+        ]
+
+    def _first_paragraph_of_page(
+        self, top_level_chapter, page_number: int, blockquotes_included: bool = False
+    ) -> Paragraph | None:
+        paragraphs = self._paragraphs_of_page(
+            top_level_chapter, page_number, blockquotes_included
+        )
+        return paragraphs[0] if paragraphs else None
+
+    def _last_paragraph_of_page(
+        self, top_level_chapter, page_number: int, blockquotes_included: bool = False
+    ) -> Paragraph | None:
+        paragraphs = self._paragraphs_of_page(
+            top_level_chapter, page_number, blockquotes_included
+        )
+        return paragraphs[-1] if paragraphs else None
 
     def reconstitute_paragraphs_spreading_over_two_pages(
         self, top_level_chapter
@@ -102,26 +111,10 @@ class ParagraphMerger:
         - when doing so make sure that the sentence that got split gets also
           properly reconstituted
         """
-        if not isinstance(top_level_chapter, TopLevelChapter):
-            return
-
-        if len(top_level_chapter.pages) == 1:
-            return
-
-        for page_index in range(0, len(top_level_chapter.pages) - 1):
-            current_page = top_level_chapter.pages[page_index]
-            page_number = current_page.page_number
-            if not self._page_requires_paragraph_continuation(page_number):
-                continue
-            next_page_number = (
-                self.structural_info._get_page_number_finishing_last_paragraph(
-                    page_number
-                )
-            )
-            if self.structural_info._holds_new_chapter(next_page_number):
-                continue
-
-            ill_starting_paragraph = self._chapter_get_first_paragraph_of_given_page(
+        for page_number, next_page_number in self._page_breaks_to_mend(
+            top_level_chapter, self._page_requires_paragraph_continuation
+        ):
+            ill_starting_paragraph = self._first_paragraph_of_page(
                 top_level_chapter, next_page_number
             )
             if ill_starting_paragraph is None:
@@ -132,19 +125,11 @@ class ParagraphMerger:
                     f"(needed to continue the paragraph of page {page_number})."
                 )
                 continue
-            if not isinstance(ill_starting_paragraph, Paragraph):
-                self._diagnostics.warn("Ill starting paragraph is not ... a paragraph.")
-                self._diagnostics.warn("Not merging.")
-                continue
 
-            ill_ending_paragraph = self._chapter_get_last_paragraph_of_given_page(
+            ill_ending_paragraph = self._last_paragraph_of_page(
                 top_level_chapter, page_number
             )
             if ill_ending_paragraph is None:
-                continue
-            if not isinstance(ill_ending_paragraph, Paragraph):
-                self._diagnostics.warn("Ill ending paragraph is not ... a paragraph.")
-                self._diagnostics.warn("Not merging.")
                 continue
             if not ill_ending_paragraph.get_sentences():
                 continue
@@ -178,14 +163,6 @@ class ParagraphMerger:
                 next_page_number,
             )
 
-    def _leaves_in_reading_order(self, level):
-        """The paragraphs, tables and headings of a level, whatever their depth."""
-        for sublevel in level.get_sublevels() or []:
-            if isinstance(sublevel, (Paragraph, Table, Heading)):
-                yield sublevel
-            elif hasattr(sublevel, "get_sublevels"):
-                yield from self._leaves_in_reading_order(sublevel)
-
     def _table_lies_between(
         self,
         top_level_chapter,
@@ -195,7 +172,7 @@ class ParagraphMerger:
         """Whether a table (or a heading) comes in between two paragraphs (in
         reading order)."""
         ending_paragraph_seen = False
-        for leaf in self._leaves_in_reading_order(top_level_chapter):
+        for leaf in top_level_chapter.leaves_in_reading_order():
             if leaf is starting_paragraph:
                 return False
             if leaf is ending_paragraph:
@@ -286,46 +263,6 @@ class ParagraphMerger:
         # Then merge the two paragraphs:
         ill_ending_paragraph.merge(ill_starting_paragraph)
 
-    def _page_requires_blockquote_continuation(self, page_number: int) -> bool:
-        return not self.structural_info.page_info(page_number).blockquote_fits_on_page
-
-    def _chapter_get_first_element_of_given_page(
-        self, chapter, page_number: int
-    ) -> Paragraph | None:
-        """First paragraph or blockquote of the page, whatever its kind."""
-        for sublevel in chapter.get_sublevels() or []:
-            if isinstance(
-                sublevel, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)
-            ):
-                sublevel_result = self._chapter_get_first_element_of_given_page(
-                    sublevel, page_number
-                )
-                if sublevel_result is not None:
-                    return sublevel_result
-            elif isinstance(sublevel, Paragraph):
-                if sublevel.has_page_number(page_number):
-                    return sublevel
-        return None
-
-    def _chapter_get_last_element_of_given_page(
-        self, chapter, page_number: int
-    ) -> Paragraph | None:
-        """Last paragraph or blockquote of the page, whatever its kind."""
-        element_of_that_page = None
-        for sublevel in chapter.get_sublevels() or []:
-            if isinstance(
-                sublevel, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)
-            ):
-                result = self._chapter_get_last_element_of_given_page(
-                    sublevel, page_number
-                )
-                if result is not None:
-                    element_of_that_page = result
-            elif isinstance(sublevel, Paragraph):
-                if sublevel.has_page_number(page_number):
-                    element_of_that_page = sublevel
-        return element_of_that_page
-
     def reconstitute_blockquotes_spreading_over_two_pages(
         self, top_level_chapter
     ) -> None:
@@ -338,28 +275,18 @@ class ParagraphMerger:
         never glued to a blockquote. The pages flagged with
         "blockquote_fits_on_page" are left untouched.
         """
-        if not isinstance(top_level_chapter, TopLevelChapter):
-            return
-
-        for page_index in range(0, len(top_level_chapter.pages) - 1):
-            page_number = top_level_chapter.pages[page_index].page_number
-            if not self._page_requires_blockquote_continuation(page_number):
-                continue
-            next_page_number = (
-                self.structural_info._get_page_number_finishing_last_paragraph(
-                    page_number
-                )
-            )
-            if self.structural_info._holds_new_chapter(next_page_number):
-                continue
-
-            ending_element = self._chapter_get_last_element_of_given_page(
-                top_level_chapter, page_number
+        for page_number, next_page_number in self._page_breaks_to_mend(
+            top_level_chapter, self._page_requires_blockquote_continuation
+        ):
+            # Blockquotes included: what ends and starts the pages, whatever
+            # its kind, must be blockquotes.
+            ending_element = self._last_paragraph_of_page(
+                top_level_chapter, page_number, blockquotes_included=True
             )
             if not isinstance(ending_element, BlockQuoteParagraph):
                 continue
-            starting_element = self._chapter_get_first_element_of_given_page(
-                top_level_chapter, next_page_number
+            starting_element = self._first_paragraph_of_page(
+                top_level_chapter, next_page_number, blockquotes_included=True
             )
             if not isinstance(starting_element, BlockQuoteParagraph):
                 continue

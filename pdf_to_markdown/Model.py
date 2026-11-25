@@ -314,13 +314,21 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         ):
             return
         paragraph_texts = [
-            sublevel.get_markdown_text() if isinstance(sublevel, Paragraph) else None
-            for sublevel in self.sublevels
+            self._get_text_for_list_heuristics(sublevel) for sublevel in self.sublevels
         ]
         placements = NumberedListAnnotator().heuristic_annotate(paragraph_texts)
         for sublevel, placement in zip(self.sublevels, placements):
-            if isinstance(sublevel, Paragraph):
+            if isinstance(sublevel, (Paragraph, Table)):
                 sublevel.numbered_list_placement = placement
+
+    @staticmethod
+    def _get_text_for_list_heuristics(sublevel) -> "str | object | None":
+        """What the NumberedListAnnotator is told about a sublevel."""
+        if isinstance(sublevel, Paragraph):
+            return sublevel.get_markdown_text()
+        if isinstance(sublevel, Table):
+            return NumberedListAnnotator.TABLE_SIBLING
+        return None
 
 
 class Paragraph(DocumentHierarchicalLevel[Sentence]):
@@ -462,6 +470,9 @@ class Table(Numbered, Parent):
         self.page_layout = layout
         # A table has no text of its own, refer to Paragraph.text.
         self.text = None
+        # Set by the owning level when converting to markdown (a table lying
+        # between two items of a numbered list belongs to the item above it)
+        self.numbered_list_placement = NumberedListPlacement()
 
     def get_sentences(self) -> None:
         """A table has no sentences (this is for the callers walking paragraphs)."""
@@ -476,11 +487,14 @@ class Table(Numbered, Parent):
         if not self.rows:
             self._logger.warning(f"Useless table {self.name!r} with no rows.")
             return
+        indentation = " " * self.numbered_list_placement.indentation
         if self.has_column_headings and self.caption:
             # A line above the table (not emphasized, which would trigger the
             # markdownlint rule MD036).
-            md_file.new_paragraph(self.caption)
-        md_file.new_paragraph("\n".join(self.get_markdown_lines()))
+            md_file.new_paragraph(indentation + self.caption)
+        md_file.new_paragraph(
+            "\n".join(indentation + line for line in self.get_markdown_lines())
+        )
 
     def get_markdown_lines(self) -> list[str]:
         column_count = max(len(row) for row in self.rows)

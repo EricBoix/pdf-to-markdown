@@ -61,16 +61,25 @@ class NumberedListAnnotator:
 
     FAILURE_NOTE = "<!-- Converter note: failing on ordered list -->"
 
+    # Stands for a table in the paragraph texts given to heuristic_annotate.
+    # Unlike any other sibling that is not a paragraph (None), a table does not
+    # end the lists: the one lying between two items of a list belongs to the
+    # item above it.
+    TABLE_SIBLING = object()
+
     _ITEM_REGEX = re.compile(r"(\d+)\. ")
 
     def heuristic_annotate(
-        self, paragraph_texts: list[str | None]
+        self, paragraph_texts: list[str | object | None]
     ) -> list[NumberedListPlacement]:
         """Return the placement of each paragraph.
 
         A None text stands for a sibling that is not a paragraph (e.g. a
-        sub-chapter): such a sibling ends any list. A numbered paragraph that
-        belongs to no list is marked FAILED (and a warning is logged).
+        sub-chapter): such a sibling ends any list. A TABLE_SIBLING stands for
+        a table: it is a continuation of the list it lies in when the next
+        item of that list follows it (and ends the list otherwise). A numbered
+        paragraph that belongs to no list is marked FAILED (and a warning is
+        logged).
         """
         placements = [NumberedListPlacement()] * len(paragraph_texts)
         # The number of the last item of each (nested) open list, outermost
@@ -79,6 +88,19 @@ class NumberedListAnnotator:
         for index, text in enumerate(paragraph_texts):
             if text is None:
                 open_lists = []
+                continue
+            if text is self.TABLE_SIBLING:
+                if open_lists:
+                    following_depth = self._depth_of_following_item(
+                        paragraph_texts, index, open_lists
+                    )
+                    if following_depth is None:
+                        open_lists = []
+                    else:
+                        placements[index] = NumberedListPlacement(
+                            NumberedListRole.CONTINUATION,
+                            self._indentation(open_lists, following_depth + 1),
+                        )
                 continue
             item_number = self._item_number(text)
             if item_number is not None:
@@ -135,7 +157,10 @@ class NumberedListAnnotator:
         return int(match.group(1)) if match else None
 
     def _depth_of_following_item(
-        self, paragraph_texts: list[str | None], index: int, open_lists: list[int]
+        self,
+        paragraph_texts: list[str | object | None],
+        index: int,
+        open_lists: list[int],
     ) -> int | None:
         """The depth of the list of the next item, when it is not too far.
 
@@ -148,6 +173,8 @@ class NumberedListAnnotator:
         for following_text in paragraph_texts[index + 1 : last_index]:
             if following_text is None:
                 return None
+            if following_text is self.TABLE_SIBLING:
+                continue
             following_number = self._item_number(following_text)
             if following_number is not None:
                 # Any item ends the search. A "1." is not taken for a nested

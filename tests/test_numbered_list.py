@@ -104,6 +104,52 @@ class TestNumberedListAnnotator:
         assert NumberedListAnnotator.indent("a. Sit", 3) == "   a. Sit"
 
 
+TABLE = NumberedListAnnotator.TABLE_SIBLING
+
+
+class TestTableInsideAList:
+    def test_table_and_paragraph_between_two_items_belong_to_the_item_above(self):
+        texts = ["1. One", "2. Align:", TABLE, "Comment on the table.", "3. Next"]
+        assert NumberedListAnnotator().heuristic_annotate(texts) == [
+            ITEM,
+            ITEM,
+            continuation(3),
+            continuation(3),
+            ITEM,
+        ]
+
+    def test_table_without_following_item_ends_the_list(self):
+        texts = ["1. One", TABLE, "Text after the table.", "3. Out of order"]
+        assert NumberedListAnnotator().heuristic_annotate(texts) == [
+            ITEM,
+            NONE,
+            NONE,
+            NumberedListPlacement(NumberedListRole.FAILED),
+        ]
+
+    def test_table_outside_of_any_list_is_left_untouched(self):
+        texts = ["Some text.", TABLE, "More text."]
+        assert NumberedListAnnotator().heuristic_annotate(texts) == [NONE] * 3
+
+    def test_table_inside_a_nested_list_is_indented_like_the_item_above(self):
+        texts = ["1. Outer", "1. Inner", TABLE, "2. Next inner"]
+        assert NumberedListAnnotator().heuristic_annotate(texts) == [
+            ITEM,
+            nested_item(3),
+            continuation(6),
+            nested_item(3),
+        ]
+
+    def test_other_sibling_still_ends_the_list(self):
+        texts = ["1. One", None, TABLE, "2. Two"]
+        assert NumberedListAnnotator().heuristic_annotate(texts) == [
+            ITEM,
+            NONE,
+            NONE,
+            NumberedListPlacement(NumberedListRole.FAILED),
+        ]
+
+
 class TestIsNextItem:
     def test_item_following_the_last_item(self):
         texts = ["1. First", "continuation", "2. Second", "more text"]

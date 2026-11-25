@@ -11,6 +11,8 @@ from mdutils.mdutils import MdUtils
 from pdf_to_markdown import (
     ExtractedPage,
     PageLayout,
+    NumberedListPlacement,
+    NumberedListRole,
     Paragraph,
     ParagraphAndBlockquoteSplitter,
     ParagraphMerger,
@@ -303,6 +305,25 @@ class TestTableMarkdown:
             "| --- | --- |",
             "| 1. One | |",
             "| | 2. Two |",
+        ]
+
+    def test_table_inside_a_list_item_is_indented_with_the_item(self):
+        table = Table(
+            PageLayout("1", 1),
+            "t",
+            "A caption",
+            True,
+            [["A", "B"], ["1", "2"]],
+        )
+        table.numbered_list_placement = NumberedListPlacement(
+            NumberedListRole.CONTINUATION, 3
+        )
+        assert self._markdown_of(table).strip("\n").split("\n") == [
+            "   A caption",
+            "",
+            "   | A | B |",
+            "   | --- | --- |",
+            "   | 1 | 2 |",
         ]
 
     def test_caption_takes_the_header_row_of_a_table_without_column_headings(self):

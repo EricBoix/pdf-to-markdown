@@ -6,6 +6,7 @@ from .Model import (
     SubChapterOfParagraphs,
     Paragraph,
     Table,
+    Heading,
 )
 from .PageLayout import PageLayout
 from .TableRegistry import TableRegistry
@@ -21,6 +22,7 @@ class Splitter(Protocol):
     def get_sublevel_name(self, content_text: str) -> str | None: ...
     def is_blockquote(self, part_text: str) -> bool: ...
     def is_table(self, part_text: str) -> bool: ...
+    def is_heading(self, part_text: str) -> bool: ...
 
 
 class ContentWithLayout(Protocol):
@@ -53,19 +55,25 @@ class LevelBreaker:
         self.sublevel_factory = sublevel_factory
         self.break_level = break_level_callback
         self.break_paragraphs = break_paragraphs_callback
-        self._diagnostics = diagnostics if diagnostics is not None else DiagnosticsReporter()
+        self._diagnostics = (
+            diagnostics if diagnostics is not None else DiagnosticsReporter()
+        )
         self._table_registry = table_registry
 
     def break_into_sublevels(
         self, contents: list[ContentWithLayout] | None = None
     ) -> None:
         """Break a hierarchical level into sublevels using the provided splitter."""
-        self._diagnostics.debug(f"########### break_into_sublevels, level: {self.level}")
+        self._diagnostics.debug(
+            f"########### break_into_sublevels, level: {self.level}"
+        )
 
         if not contents:
             contents = self.level.get_text_with_layout()
             if not contents:
-                self._diagnostics.warn(f"DocumentHierarchicalLevel {self.level} with NO text content.")
+                self._diagnostics.warn(
+                    f"DocumentHierarchicalLevel {self.level} with NO text content."
+                )
 
         current_level = self.level
         # A sublevel name (e.g. a section title) may be the very last line of
@@ -79,7 +87,9 @@ class LevelBreaker:
                 # The newline is the one that ended the name on its page.
                 content_text = pending_name_text + "\n" + content_text
             pending_name_text = ""
-            self._diagnostics.debug(f"####### break_into_sublevels, contents: {content_text}")
+            self._diagnostics.debug(
+                f"####### break_into_sublevels, contents: {content_text}"
+            )
             if not content_text:
                 self._diagnostics.warn(f"level with NO text.")
                 continue
@@ -89,7 +99,9 @@ class LevelBreaker:
 
             parts = self.level_splitter.split(content_text)
             while parts:
-                self._diagnostics.debug(f"### break_into_sublevels, ({len(parts)}) parts: {parts}")
+                self._diagnostics.debug(
+                    f"### break_into_sublevels, ({len(parts)}) parts: {parts}"
+                )
 
                 if self._is_trailing_name_only(parts, level_content is contents[-1]):
                     pending_name_text = parts[0]
@@ -156,6 +168,17 @@ class LevelBreaker:
         self.break_level(table)
         current_level.add_sublevel(table)
 
+    def _add_heading(
+        self,
+        new_layout: PageLayout,
+        current_level: DocumentHierarchicalLevel,
+        title: str,
+    ) -> None:
+        """Add to the current level the heading that the splitter found."""
+        current_level.add_sublevel(
+            Heading(new_layout, TextSanitizer.normalize_chapter_name(title))
+        )
+
     def _handle_unbreakable_text(
         self,
         new_layout: PageLayout,
@@ -170,6 +193,9 @@ class LevelBreaker:
         if new_sublevel_type == Paragraph:
             if self.level_splitter.is_table(parts[0]):
                 self._add_table(new_layout, current_level, parts[0])
+                return False, remaining
+            if self.level_splitter.is_heading(parts[0]):
+                self._add_heading(new_layout, current_level, parts[0])
                 return False, remaining
             if not parts[0].strip():
                 self._diagnostics.warn("Skipping paragraph with empty text.")

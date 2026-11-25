@@ -5,6 +5,7 @@ from .Model import (
     Paragraph,
     Sentence,
     Table,
+    Heading,
     TopLevelChapter,
 )
 from .DiagnosticsReporter import DiagnosticsReporter
@@ -182,9 +183,9 @@ class ParagraphMerger:
             )
 
     def _leaves_in_reading_order(self, level):
-        """The paragraphs and the tables of a level, whatever their depth."""
+        """The paragraphs, tables and headings of a level, whatever their depth."""
         for sublevel in level.get_sublevels() or []:
-            if isinstance(sublevel, (Paragraph, Table)):
+            if isinstance(sublevel, (Paragraph, Table, Heading)):
                 yield sublevel
             elif hasattr(sublevel, "get_sublevels"):
                 yield from self._leaves_in_reading_order(sublevel)
@@ -195,14 +196,15 @@ class ParagraphMerger:
         ending_paragraph: Paragraph,
         starting_paragraph: Paragraph,
     ) -> bool:
-        """Whether a table comes in between two paragraphs (in reading order)."""
+        """Whether a table (or a heading) comes in between two paragraphs (in
+        reading order)."""
         ending_paragraph_seen = False
         for leaf in self._leaves_in_reading_order(top_level_chapter):
             if leaf is starting_paragraph:
                 return False
             if leaf is ending_paragraph:
                 ending_paragraph_seen = True
-            elif ending_paragraph_seen and isinstance(leaf, Table):
+            elif ending_paragraph_seen and isinstance(leaf, (Table, Heading)):
                 return True
         return False
 

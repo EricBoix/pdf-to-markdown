@@ -26,6 +26,10 @@ class ChapterSplitter:
         # First check static declaration in pages_info
         if self.structural_info._holds_new_chapter(extracted_page.page_number):
             return True
+        # A page may be declared not to open a chapter (the regex is fooled by
+        # e.g. a centered sub-title followed by blank lines)
+        if self.structural_info._forbids_new_chapter(extracted_page.page_number):
+            return False
         # Then check regex pattern
         match = re.search(self.separator_regex, extracted_page.text)
         if not match:
@@ -73,6 +77,16 @@ class TableText(str):
     """
 
 
+class HeadingText(str):
+    """The text of a part, produced by a splitter, that is a heading: the title
+    of a sub-section that the hierarchy of levels has no level for.
+
+    Like BlockquoteText it is a plain str that carries the information "this
+    part is a heading" along with the text (the title), see
+    Splitter.is_heading().
+    """
+
+
 class Splitter:
     _logger = logging.getLogger("pdf_to_markdown")
 
@@ -87,6 +101,13 @@ class Splitter:
         """Whether a part returned by split() stands for a table (and not e.g. a paragraph).
 
         Splitters that do not detect tables never return one.
+        """
+        return False
+
+    def is_heading(self, part_text) -> bool:
+        """Whether a part returned by split() is a heading (and not e.g. a paragraph).
+
+        Splitters that do not detect headings never return one.
         """
         return False
 
@@ -262,21 +283,34 @@ class ParagraphAndBlockquoteSplitter(NameLessSinglePatternSplitter):
     not paragraph beginnings) might even match that pattern, thus being broken
     into one paragraph per line. The blockquotes are thus cut out of the text
     first, with their own pattern, and the paragraph breaking pattern is only
-    applied to the text surrounding them.
+    applied to the text surrounding them. The headings (titles of sub-sections
+    that have no level of their own) are cut out first, the same way.
     """
 
-    def __init__(self, paragraph_breaking_pattern, blockquote_pattern) -> None:
+    def __init__(
+        self, paragraph_breaking_pattern, blockquote_pattern, heading_pattern=None
+    ) -> None:
         """
         :param paragraph_breaking_pattern: the pattern separating paragraphs
         :param blockquote_pattern: the pattern matching a whole blockquote
             (including the separation with its surrounding text). Its first
             capturing group is the text of the blockquote.
+        :param heading_pattern: optional pattern matching a whole heading
+            (including the separation with its surrounding text, the blank
+            lines following it included). Its first capturing group is the
+            title.
         """
         NameLessSinglePatternSplitter.__init__(self, paragraph_breaking_pattern)
         self.blockquote_pattern = re.compile(blockquote_pattern)
+        self.heading_pattern = (
+            re.compile(heading_pattern) if heading_pattern is not None else None
+        )
 
     def is_blockquote(self, part_text) -> bool:
         return isinstance(part_text, BlockquoteText)
+
+    def is_heading(self, part_text) -> bool:
+        return isinstance(part_text, HeadingText)
 
     def is_table(self, part_text) -> bool:
         return isinstance(part_text, TableText)
@@ -299,6 +333,31 @@ class ParagraphAndBlockquoteSplitter(NameLessSinglePatternSplitter):
         return parts
 
     def _split_into_paragraphs_and_blockquotes(self, content_text) -> list[str]:
+        if self.heading_pattern is None:
+            return self._split_around_blockquotes(content_text)
+        parts = []
+        position = 0
+        follows_heading = False
+        for match in self.heading_pattern.finditer(content_text):
+            parts += self._split_after_heading(
+                content_text[position : match.start()], follows_heading
+            )
+            parts.append(HeadingText(match.group(1)))
+            position = match.end()
+            follows_heading = True
+        parts += self._split_after_heading(content_text[position:], follows_heading)
+        return parts
+
+    def _split_after_heading(self, text, follows_heading) -> list[str]:
+        # The text following a heading starts like the text of a page does:
+        # without the separator of its first paragraph (the heading pattern
+        # holds the blank lines) and, unless it is a blockquote (recognized
+        # at the very beginning of a text), without indentation.
+        if follows_heading and not self.blockquote_pattern.match(text):
+            text = text.lstrip(" ")
+        return self._split_around_blockquotes(text)
+
+    def _split_around_blockquotes(self, content_text) -> list[str]:
         parts = []
         position = 0
         for match in self.blockquote_pattern.finditer(content_text):
@@ -315,9 +374,7 @@ class ParagraphAndBlockquoteSplitter(NameLessSinglePatternSplitter):
         # when the breaking pattern holds a capturing group.
         leading_separator = re.match(self.breaking_pattern, text_without_blockquote)
         if leading_separator:
-            text_without_blockquote = text_without_blockquote[
-                leading_separator.end() :
-            ]
+            text_without_blockquote = text_without_blockquote[leading_separator.end() :]
         if not text_without_blockquote.strip():
             return []
         return NameLessSinglePatternSplitter.split(self, text_without_blockquote)

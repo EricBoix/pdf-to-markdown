@@ -8,6 +8,7 @@ from .Model import (
     Paragraph,
     BlockQuoteParagraph,
     Table,
+    Heading,
     TopLevelChapterOfParagraphs,
     SubChapterOfParagraphs,
     SuperChapter,
@@ -38,6 +39,7 @@ from .Splitter import (
     NameLessSinglePatternSplitter,
     ParagraphAndBlockquoteSplitter,
     BlockquoteText,
+    HeadingText,
     TableText,
 )
 from .TableDeclaration import TableDeclaration

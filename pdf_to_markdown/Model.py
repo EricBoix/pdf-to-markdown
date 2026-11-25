@@ -268,6 +268,16 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         self.owning_hierarchical_level.remove_sublevel(other)
         self.owning_hierarchical_level.renumber_sublevels()
 
+    @classmethod
+    def get_header_line(cls, name: str, level: int) -> str:
+        """The (atx) markdown header of the given name, at the given level."""
+        header = "#" * level + " " + name
+        if name.endswith(tuple(cls.HEADER_TRAILING_PUNCTUATION)):
+            # The punctuation legitimately comes from the original document:
+            # silence markdownlint (MD026) for this very line only.
+            header += cls.MARKDOWNLINT_DISABLE_MD026
+        return header
+
     def to_markdown(self, md_file: MdUtils, level) -> None:
         """
         Add this hierarchical level's content to the given MdUtils object.
@@ -278,11 +288,7 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         # starts with two newlines: a header followed by a paragraph would thus
         # get two blank lines instead of one. Hence we write the (atx) header
         # ourselves, without its trailing newline.
-        header = "#" * level + " " + self.name
-        if self.name.endswith(tuple(self.HEADER_TRAILING_PUNCTUATION)):
-            # The punctuation legitimately comes from the original document:
-            # silence markdownlint (MD026) for this very line only.
-            header += self.MARKDOWNLINT_DISABLE_MD026
+        header = self.get_header_line(self.name, level)
         # markdownlint rule MD022 requires a blank line before a header, that
         # is two newlines. What precedes depends on the previous sibling: a
         # paragraph does not end with a newline (MdUtils.new_paragraph()
@@ -292,7 +298,9 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         trailing_newlines = len(previous_text) - len(previous_text.rstrip("\n"))
         missing_newlines = 1 if not previous_text else max(0, 2 - trailing_newlines)
         md_file.write("\n" * missing_newlines + header)
-        if self.sublevels and not isinstance(self.sublevels[0], (Paragraph, Table)):
+        if self.sublevels and not isinstance(
+            self.sublevels[0], (Paragraph, Table, Heading)
+        ):
             # A sub header (unlike a paragraph) does not start with a blank
             # line of its own: provide the blank line separating the headers.
             md_file.write("\n")
@@ -328,6 +336,7 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
             return sublevel.get_markdown_text()
         if isinstance(sublevel, Table):
             return NumberedListAnnotator.TABLE_SIBLING
+        # Any other sibling (e.g. a heading) ends the lists.
         return None
 
 
@@ -526,6 +535,39 @@ class Table(Numbered, Parent):
             " " + cell.replace("|", "\\|") + " " if cell else " " for cell in padded_row
         ]
         return "|" + "|".join(formatted_cells) + "|"
+
+
+class Heading(Numbered, Parent):
+    """The title of a sub-section that the hierarchy of levels has no level for
+    (e.g. a centered sub-title within the notes of a book), a leaf of the
+    hierarchy like a Table or a Paragraph.
+
+    It is a flat marker: it does not own the paragraphs that follow it, which
+    remain siblings. It is written as a markdown header one level below the
+    level holding it.
+    """
+
+    def __init__(self, layout: PageLayout, name: str) -> None:
+        Numbered.__init__(self)
+        Parent.__init__(self)
+        self.name = name
+        self.page_layout = layout
+        # A heading has no text of its own, refer to Paragraph.text.
+        self.text = None
+
+    def get_sentences(self) -> None:
+        """A heading has no sentences (this is for the callers walking paragraphs)."""
+        return None
+
+    def get_document_reference_long(self) -> str:
+        page_reader = self.page_layout.reader_page_number if self.page_layout else "?"
+        return f"Heading {self.name!r} (page {page_reader})"
+
+    def to_markdown(self, md_file: MdUtils, level) -> None:
+        """Add this heading to the given MdUtils object."""
+        md_file.new_paragraph(
+            DocumentHierarchicalLevel.get_header_line(self.name, level)
+        )
 
 
 class TopLevelChapter:

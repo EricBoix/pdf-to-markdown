@@ -31,6 +31,11 @@ class StructuralInfoBase(ABC):
                                             # previous page with its first row
                                             # on this page, False forbids it
                                             # (absent: decided by heuristic)
+            "no_new_chapter": True,         # optional: the page does not open
+                                            # a chapter, whatever its text
+                                            # looks like (e.g. a centered
+                                            # sub-title followed by blank lines
+                                            # is not a chapter title)
         },
     }
     """
@@ -44,6 +49,7 @@ class StructuralInfoBase(ABC):
     KEY_TYPO = "typo"
     KEY_FIX = "fix"
     KEY_TABLE_ROW_CONTINUES = "table_row_continues"
+    KEY_NO_NEW_CHAPTER = "no_new_chapter"
 
     @property
     @abstractmethod
@@ -182,6 +188,13 @@ class StructuralInfoBase(ABC):
     def _get_chapter_name(self, page_number) -> str | None:
         chapter_info = self._get_chapter_info(page_number)
         return chapter_info.get(self.KEY_NAME)
+
+    def _forbids_new_chapter(self, page_number) -> bool:
+        """Whether the page is declared not to open a chapter (see
+        ChapterSplitter.holds_new_chapter), whatever its text looks like."""
+        if not page_number in self.pages_info:
+            return False
+        return bool(self.pages_info[page_number].get(self.KEY_NO_NEW_CHAPTER, False))
 
     def _holds_new_chapter(self, page_number) -> bool:
         if not page_number in self.pages_info:

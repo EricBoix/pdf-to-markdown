@@ -6,6 +6,7 @@ from .Model import (
     SuperChapter,
     Paragraph,
     Table,
+    Heading,
 )
 
 # A set of debugging utilities.
@@ -96,7 +97,7 @@ class PrintDocument:
                     sublevel, (TopLevelChapterOfParagraphs, SubChapterOfParagraphs)
                 ):
                     self._print_chapter(sublevel)
-                elif isinstance(sublevel, (Paragraph, Table)):
+                elif isinstance(sublevel, (Paragraph, Table, Heading)):
                     self._print_paragraph_and_sentences(sublevel)
 
     def _print_chapter(self, chapter) -> None:
@@ -108,9 +109,7 @@ class PrintDocument:
 
     def _print_super_chapter(self, super_chapter) -> None:
         if not isinstance(super_chapter, SuperChapter):
-            raise ConverterError(
-                f"Chapter {super_chapter.name} is not a SuperChapter."
-            )
+            raise ConverterError(f"Chapter {super_chapter.name} is not a SuperChapter.")
         print("###################################################################")
         print("################## Super Chapter name: ", super_chapter.name)
         print("###################################################################")
@@ -120,7 +119,7 @@ class PrintDocument:
             ):
                 self._print_chapter_of_paragraphs(sublevel)
                 continue
-            if isinstance(sublevel, (Paragraph, Table)):
+            if isinstance(sublevel, (Paragraph, Table, Heading)):
                 self._print_paragraph_and_sentences(sublevel)
                 continue
             raise ConverterError(

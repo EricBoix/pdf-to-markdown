@@ -1,4 +1,4 @@
-from .Model import DocumentHierarchicalLevel, Paragraph, Table
+from .Model import DocumentHierarchicalLevel, Heading, Paragraph, Table
 from .DiagnosticsReporter import DiagnosticsReporter
 from .Errors import ConverterError
 from .StructuralInfoBase import StructuralInfoBase
@@ -37,8 +37,9 @@ class SectionDropper:
     def _drop_from(self, level: DocumentHierarchicalLevel) -> None:
         for sublevel in list(level.get_sublevels() or []):
             # Paragraphs are nameless: their name is a mere placeholder that
-            # must not be mistaken for a section title. Neither is a table.
-            if isinstance(sublevel, (Paragraph, Table)):
+            # must not be mistaken for a section title. Neither is a table or a
+            # heading (a leaf with no sublevels).
+            if isinstance(sublevel, (Paragraph, Table, Heading)):
                 continue
             if self._structural_info.is_section_dropped(sublevel.name):
                 self._diagnostics.debug(f"Dropping section: {sublevel.name!r}")

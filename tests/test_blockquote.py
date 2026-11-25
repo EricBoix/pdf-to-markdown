@@ -189,8 +189,9 @@ class TestBlockquoteDeduplicator:
 
 
 class TestParagraphMergerIgnoresBlockquotes:
-    class _StructuralInfo:
+    class _StructuralInfo(StructuralInfoBase):
         pages_info = {}
+        total_page_number = 2
         numbered_list_heuristics_enabled = True
 
         def _get_page_number_finishing_last_paragraph(self, page_number):

@@ -7,6 +7,7 @@ from pdf_to_markdown import (
     Paragraph,
     ParagraphMerger,
     Sentence,
+    StructuralInfoBase,
     TopLevelChapterOfParagraphs,
 )
 
@@ -21,19 +22,17 @@ def _paragraph(paragraph_class, page_number, *sentence_texts):
     return paragraph
 
 
-class _StructuralInfo:
+class _StructuralInfo(StructuralInfoBase):
+    total_page_number = 3
+
     def __init__(self, pages_info=None, new_chapter_pages=()):
-        self.pages_info = pages_info if pages_info is not None else {}
+        super().__init__()
+        self._declared_pages_info = pages_info if pages_info is not None else {}
         self._new_chapter_pages = new_chapter_pages
 
-    def _get_page_number_finishing_last_paragraph(self, page_number):
-        next_page_number = page_number + 1
-        while (
-            next_page_number in self.pages_info
-            and "drop_page" in self.pages_info[next_page_number]
-        ):
-            next_page_number += 1
-        return next_page_number
+    @property
+    def pages_info(self) -> dict:
+        return self._declared_pages_info
 
     def _holds_new_chapter(self, page_number):
         return page_number in self._new_chapter_pages

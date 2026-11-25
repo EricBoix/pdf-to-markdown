@@ -2,6 +2,7 @@ import re
 from abc import ABC, abstractmethod
 from .DiagnosticsReporter import DiagnosticsReporter
 from .Errors import ConverterError
+from .PageInfo import PageInfo
 from .TableDeclaration import TableDeclaration
 from .TableRegistry import TableRegistry
 
@@ -22,6 +23,13 @@ class StructuralInfoBase(ABC):
         1: {
             "type": "generic",
             "drop_page": True,              # optional flag to drop content
+            "paragraph_fits_on_page": True, # optional: a paragraph ending
+                                            # this page is not continued on
+                                            # the next one
+            "typo_and_fix": {               # optional: a typo of the pdf
+                "typo": "teh",              # extraction (a regular
+                "fix": "the",               # expression) and its fix; a list
+            },                              # of such dictionaries is accepted
             "blockquote_fits_on_page": True,# optional: a blockquote ending
                                             # this page is not continued on
                                             # the next one
@@ -38,18 +46,27 @@ class StructuralInfoBase(ABC):
                                             # is not a chapter title)
         },
     }
+
+    The package reads this dictionary through page_info(), that checks it
+    (see PageInfo): a key that is neither known to the package nor listed in
+    EXTRA_PAGE_INFO_KEYS is an error. The derived classes remain free to read
+    the dictionary directly for their own keys.
     """
 
     # Dictionary key constants
-    KEY_TYPE = "type"
-    KEY_CHAPTER_INFO = "chapter_info"
-    KEY_NAME = "name"
-    KEY_DROP_PAGE = "drop_page"
-    KEY_TYPO_AND_FIX = "typo_and_fix"
-    KEY_TYPO = "typo"
-    KEY_FIX = "fix"
-    KEY_TABLE_ROW_CONTINUES = "table_row_continues"
-    KEY_NO_NEW_CHAPTER = "no_new_chapter"
+    KEY_TYPE = PageInfo.KEY_TYPE
+    KEY_CHAPTER_INFO = PageInfo.KEY_CHAPTER_INFO
+    KEY_NAME = PageInfo.KEY_NAME
+    KEY_DROP_PAGE = PageInfo.KEY_DROP_PAGE
+    KEY_TYPO_AND_FIX = PageInfo.KEY_TYPO_AND_FIX
+    KEY_TYPO = PageInfo.KEY_TYPO
+    KEY_FIX = PageInfo.KEY_FIX
+    KEY_TABLE_ROW_CONTINUES = PageInfo.KEY_TABLE_ROW_CONTINUES
+    KEY_NO_NEW_CHAPTER = PageInfo.KEY_NO_NEW_CHAPTER
+
+    # The keys that a derived class declares in pages_info for its own use
+    # (and reads itself), that the package must not take for typos.
+    EXTRA_PAGE_INFO_KEYS: frozenset[str] = frozenset()
 
     @property
     @abstractmethod
@@ -101,15 +118,29 @@ class StructuralInfoBase(ABC):
             self._table_registry = TableRegistry()
         return self._table_registry
 
+    def page_info(self, page_number) -> PageInfo:
+        """The checked declaration of a page (see PageInfo).
+
+        A page that pages_info does not declare gets the defaults. All the
+        declarations are checked at the first call, hence a wrong declaration
+        fails there whichever page is asked for.
+        """
+        if self._page_infos is None:
+            self._page_infos = {
+                declared_page_number: PageInfo.from_declaration(
+                    declared_page_number, declaration, self.EXTRA_PAGE_INFO_KEYS
+                )
+                for declared_page_number, declaration in self.pages_info.items()
+            }
+        return self._page_infos.get(page_number, PageInfo())
+
     def get_table_row_continues(self, page_number) -> bool | None:
         """The declared decision about the row of a table cut by a page break.
 
         The page is the one on which the table continues. None when the
         decision is left to the heuristic of the TableExtractor.
         """
-        if not page_number in self.pages_info:
-            return None
-        return self.pages_info[page_number].get(self.KEY_TABLE_ROW_CONTINUES)
+        return self.page_info(page_number).table_row_continues
 
     def is_section_dropped(self, section_name: str) -> bool:
         """Whether a section designated by its normalized title must be dropped.
@@ -131,6 +162,8 @@ class StructuralInfoBase(ABC):
         self._chapter_page = {}
         self._chapter_splitter_instance = None
         self._table_registry = None
+        # Lazily built by page_info()
+        self._page_infos = None
         self._diagnostics = DiagnosticsReporter()
 
     def set_diagnostics(self, diagnostics: DiagnosticsReporter) -> None:
@@ -160,11 +193,7 @@ class StructuralInfoBase(ABC):
         self._chapter_page[page_number] = chapter_page_number
 
     def _page_is_dropped(self, page_number) -> bool:
-        if not page_number in self.pages_info:
-            return False
-        if not self.KEY_DROP_PAGE in self.pages_info[page_number]:
-            return False
-        return True
+        return self.page_info(page_number).drop_page
 
     def _page_is_skipped(self, page_number) -> bool:
         """
@@ -186,44 +215,24 @@ class StructuralInfoBase(ABC):
         return chapter_page[self.KEY_CHAPTER_INFO]
 
     def _get_chapter_name(self, page_number) -> str | None:
-        chapter_info = self._get_chapter_info(page_number)
-        return chapter_info.get(self.KEY_NAME)
+        chapter_page_number = self._get_chapter_page_number(page_number)
+        return self.page_info(chapter_page_number).chapter_name
 
     def _forbids_new_chapter(self, page_number) -> bool:
         """Whether the page is declared not to open a chapter (see
         ChapterSplitter.holds_new_chapter), whatever its text looks like."""
-        if not page_number in self.pages_info:
-            return False
-        return bool(self.pages_info[page_number].get(self.KEY_NO_NEW_CHAPTER, False))
+        return self.page_info(page_number).no_new_chapter
 
     def _holds_new_chapter(self, page_number) -> bool:
-        if not page_number in self.pages_info:
-            return False
-        if not self.KEY_TYPE in self.pages_info[page_number]:
-            return False
-        if self.pages_info[page_number][self.KEY_TYPE] == "chapter":
-            return True
-        return False
-
-    def get_typo_and_fix(self, page_number) -> dict | list | None:
-        if not page_number in self.pages_info:
-            return None
-        if not self.KEY_TYPO_AND_FIX in self.pages_info[page_number]:
-            return None
-        return self.pages_info[page_number][self.KEY_TYPO_AND_FIX]
+        return self.page_info(page_number).is_chapter
 
     def fix_typos(self, extracted_page) -> None:
         """Apply typo fixes on extracted pages that require it."""
         page_number = extracted_page.page_number
-        typo_and_fix = self.get_typo_and_fix(page_number)
-        if typo_and_fix is None:
-            return
-        # Accept either a single fix dict or a list of fix dicts.
-        fixes = typo_and_fix if isinstance(typo_and_fix, list) else [typo_and_fix]
-        for fix_entry in fixes:
-            typo = fix_entry[self.KEY_TYPO]
+        for typo_fix in self.page_info(page_number).typo_fixes:
+            typo = typo_fix.typo
             fixed_text, substitution_count = re.subn(
-                typo, fix_entry[self.KEY_FIX], extracted_page.text
+                typo, typo_fix.fix, extracted_page.text
             )
             if substitution_count == 0:
                 self._diagnostics.warn(

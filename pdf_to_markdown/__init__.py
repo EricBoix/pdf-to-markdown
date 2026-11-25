@@ -30,6 +30,7 @@ from .TextExtractor import TextExtractor
 from .TextSanitizer import TextSanitizer
 from .ParagraphMerger import ParagraphMerger
 from .ExtractedPage import ExtractedPage
+from .PageInfo import PageInfo, TypoFix
 from .StructuralInfoBase import StructuralInfoBase
 from .Splitter import (
     ChapterSplitter,

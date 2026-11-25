@@ -69,21 +69,11 @@ class DocumentBreaker:
             )
 
     def _validate_page_structure(self, page_number) -> None:
-        """Validate page has required structural info."""
-        pages_info = self.structural_info.pages_info
-        if page_number not in pages_info:
-            return
+        """Validate page has required structural info.
 
-        page_info = pages_info[page_number]
-        key_type = self.structural_info.KEY_TYPE
-        key_chapter_info = self.structural_info.KEY_CHAPTER_INFO
-        key_name = self.structural_info.KEY_NAME
-
-        if page_info.get(key_type) == "chapter":
-            if key_chapter_info not in page_info:
-                raise ConverterError(f"Chapter page {page_number} missing chapter_info.")
-            elif key_name not in page_info[key_chapter_info]:
-                raise ConverterError(f"Chapter page {page_number} missing name in chapter_info.")
+        The declarations of all the pages are checked when the first page is
+        asked for, see StructuralInfoBase.page_info."""
+        self.structural_info.page_info(page_number)
 
     def break_document_into_chapters(
         self,

@@ -170,8 +170,9 @@ class TestHeadingIsALeaf:
         assert chapter._get_text_for_list_heuristics(chapter.get_sublevels()[0]) is None
 
 
-class _MergerStructuralInfo:
+class _MergerStructuralInfo(StructuralInfoBase):
     pages_info = {}
+    total_page_number = 2
     numbered_list_heuristics_enabled = False
 
     def _get_page_number_finishing_last_paragraph(self, page_number):
@@ -218,7 +219,11 @@ class TestNoNewChapterPage:
     class _StructuralInfo(StructuralInfoBase):
         pages_info = {
             1: {"type": "generic", "no_new_chapter": True},
-            2: {"type": "chapter", "no_new_chapter": True},
+            2: {
+                "type": "chapter",
+                "chapter_info": {"name": "Declared chapter"},
+                "no_new_chapter": True,
+            },
             3: {"type": "generic"},
         }
         total_page_number = 4

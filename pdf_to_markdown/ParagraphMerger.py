@@ -38,11 +38,9 @@ class ParagraphMerger:
         self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
 
     def _page_requires_paragraph_continuation(self, page_number: int) -> bool:
-        if page_number not in self.structural_info.pages_info:
-            return True  # Looks a bit ambitious but let's try it
-        if "paragraph_fits_on_page" in self.structural_info.pages_info[page_number]:
-            return False
-        return True
+        # A page that declares nothing requires the continuation (looks a bit
+        # ambitious but let's try it)
+        return not self.structural_info.page_info(page_number).paragraph_fits_on_page
 
     def _chapter_get_first_paragraph_of_given_page(
         self, chapter, page_number: int
@@ -289,11 +287,7 @@ class ParagraphMerger:
         ill_ending_paragraph.merge(ill_starting_paragraph)
 
     def _page_requires_blockquote_continuation(self, page_number: int) -> bool:
-        if page_number not in self.structural_info.pages_info:
-            return True
-        if "blockquote_fits_on_page" in self.structural_info.pages_info[page_number]:
-            return False
-        return True
+        return not self.structural_info.page_info(page_number).blockquote_fits_on_page
 
     def _chapter_get_first_element_of_given_page(
         self, chapter, page_number: int

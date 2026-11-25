@@ -76,3 +76,23 @@ def test_extract_all_layout_mode_fallback():
 
     result = TextExtractor(mock_reader, mock_si).extract_all()
     assert result == {0: "fallback text"}
+
+
+def test_extract_all_text_is_folded_to_ascii():
+    reader, si = _make_mock(["He said “No.” It’s — Paññā – done…"])
+    result = TextExtractor(reader, si).extract_all()
+    assert result == {0: 'He said "No." It\'s -- Panna - done...'}
+    assert result[0].isascii()
+
+
+def test_extract_all_spaced_ellipsis_is_spelled_plainly():
+    reader, si = _make_mock(["there is . . . and no space before. . . either"])
+    result = TextExtractor(reader, si).extract_all()
+    assert result == {0: "there is... and no space before... either"}
+
+
+def test_extract_all_folds_before_the_leading_whitespace_is_stripped():
+    # The book decides what to strip once it sees plain ASCII text.
+    reader, si = _make_mock(["   “quoted”"])
+    TextExtractor(reader, si).extract_all()
+    si.strip_page_text_leading_whitespace.assert_called_once_with('   "quoted"')

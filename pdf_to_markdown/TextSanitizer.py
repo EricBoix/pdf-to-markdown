@@ -141,7 +141,8 @@ class TextSanitizer:
         # fmt: on
         return text
 
-    def _normalize_newlines_and_multiple_whitespaces(self, input_text: str) -> str:
+    @staticmethod
+    def normalize_newlines_and_multiple_whitespaces(input_text: str) -> str:
         """Remove newlines and collapse multiple whitespaces.
 
         Newlines are encountered to denote different usages:

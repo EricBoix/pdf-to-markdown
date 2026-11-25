@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Protocol
 
-import nltk
-
 from .Model import (
     TopLevelChapterOfParagraphs,
     SubChapterOfParagraphs,
@@ -19,6 +17,7 @@ from .StructuralInfoBase import StructuralInfoBase
 from .DiagnosticsReporter import DiagnosticsReporter
 from .Errors import ConverterError
 from .LevelBreaker import LevelBreaker
+from .SentenceBreaker import SentenceBreaker
 from .TextSanitizer import TextSanitizer
 from .ParagraphMerger import ParagraphMerger
 from .BlockquoteDeduplicator import BlockquoteDeduplicator
@@ -91,25 +90,9 @@ class DocumentBuilder(TextSanitizer, ABC):
                 "Error: trying to break a paragraph into sentences but "
                 "the paragraph text is None."
             )
-        paragraph_text = TextSanitizer.normalize_spaced_ellipsis(paragraph.text)
-        tokenized_text = nltk.tokenize.sent_tokenize(paragraph_text)
-        sanitized_sentences = [
-            self._normalize_newlines_and_multiple_whitespaces(
-                self.sanitize_characters(sentence)
-            )
-            for sentence in tokenized_text
-            if sentence
-        ]
-        # Boundary apostrophes from sentence splitting are preserved as-is.
-        # They are meaningful fragments of the original quotation and must not
-        # be stripped or re-injected. See TextSanitizer.frame_sentences_if_unbalanced
-        # for the full rationale.
-        final_sentences = TextSanitizer.frame_sentences_if_unbalanced(
-            sanitized_sentences
-        )
-        for new_sentence_text in final_sentences:
-            if not new_sentence_text:
-                continue
+        # (The boundary apostrophes of the sentences are preserved as-is, see
+        # SentenceBreaker.)
+        for new_sentence_text in SentenceBreaker.break_into_sentences(paragraph.text):
             new_sentence_layout = paragraph_layout.__copy__()
             new_sentence = Sentence(new_sentence_text, new_sentence_layout)
             paragraph.add_sublevel(new_sentence)
@@ -119,8 +102,8 @@ class DocumentBuilder(TextSanitizer, ABC):
         """A table is not broken into sentences: its cell texts are sanitized."""
 
         def sanitize_cell(cell_text: str) -> str:
-            sanitized_text = self._normalize_newlines_and_multiple_whitespaces(
-                self.sanitize_characters(cell_text)
+            sanitized_text = self.normalize_newlines_and_multiple_whitespaces(
+                cell_text
             )
             if isinstance(cell_text, SpanningCellText):
                 return SpanningCellText(sanitized_text)

@@ -41,7 +41,11 @@ class BlockquoteDeduplicator:
     def _normalize(text: str) -> str:
         """Text that only differs by whitespace (e.g. line folding, hyphenation
         artifacts such as "non- perceiving") or typographic characters
-        (quotes, dashes...) normalizes to the same value."""
+        (quotes, dashes...) normalizes to the same value.
+
+        The sentences that come out of a pdf are ASCII already (see
+        TextExtractor). Those of a document that was not extracted from a pdf
+        (see MarkdownToDocument) keep their typographic characters."""
         return re.sub(r"\s+", "", TextSanitizer.sanitize_characters(text))
 
     def _collect_paragraphs(self, level: DocumentHierarchicalLevel) -> list[Paragraph]:

@@ -18,7 +18,7 @@ class ConverterBase(DocumentBuilder):
     ) -> None:
         self.pdf_filename = pdf_filename
         diagnostics = DiagnosticsReporter()
-        structural_info.set_diagnostics(diagnostics)
+        structural_info.begin_conversion(diagnostics)
         document.numbered_list_heuristics_enabled = (
             structural_info.numbered_list_heuristics_enabled
         )

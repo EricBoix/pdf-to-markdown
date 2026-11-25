@@ -13,6 +13,7 @@ from pdf_to_markdown import (
     Paragraph,
     ParagraphMerger,
     Sentence,
+    StructuralInfoBase,
     TopLevelChapterOfParagraphs,
 )
 
@@ -27,22 +28,17 @@ def _paragraph(reader_page_number, page_number, *sentence_texts):
     return paragraph
 
 
-class _StructuralInfo:
+class _StructuralInfo(StructuralInfoBase):
+    total_page_number = 3
+    numbered_list_heuristics_enabled = False
+
     def __init__(self, pages_info=None):
-        self.pages_info = pages_info if pages_info is not None else {}
-        self.numbered_list_heuristics_enabled = False
+        super().__init__()
+        self._declared_pages_info = pages_info if pages_info is not None else {}
 
-    def _get_page_number_finishing_last_paragraph(self, page_number):
-        next_page_number = page_number + 1
-        while (
-            next_page_number in self.pages_info
-            and "drop_page" in self.pages_info[next_page_number]
-        ):
-            next_page_number += 1
-        return next_page_number
-
-    def _holds_new_chapter(self, page_number):
-        return False
+    @property
+    def pages_info(self) -> dict:
+        return self._declared_pages_info
 
 
 def _merge_paragraphs(structural_info, pages, *paragraphs):

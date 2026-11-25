@@ -166,7 +166,16 @@ class StructuralInfoBase(ABC):
         self._page_infos = None
         self._diagnostics = DiagnosticsReporter()
 
-    def set_diagnostics(self, diagnostics: DiagnosticsReporter) -> None:
+    def begin_conversion(self, diagnostics: DiagnosticsReporter) -> None:
+        """Start a conversion: what a previous conversion left behind is forgotten.
+
+        Besides the diagnostics of the conversion, the run state of this
+        instance is the chapter of each page (see set_chapter_page_number) and
+        the tables cut out of the pages (see table_registry). The rest is
+        configuration, the same from one conversion to the next.
+        """
+        self._chapter_page = {}
+        self._table_registry = None
         self._diagnostics = diagnostics
 
     def get_chapter_splitter(self):

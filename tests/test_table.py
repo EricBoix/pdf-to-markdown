@@ -341,10 +341,11 @@ class TestTableMarkdown:
         ]
 
 
-class _MergerStructuralInfo:
+class _MergerStructuralInfo(StructuralInfoBase):
     """What ParagraphMerger asks of a structural info, for a two pages chapter."""
 
     pages_info = {}
+    total_page_number = 2
     numbered_list_heuristics_enabled = False
 
     def _get_page_number_finishing_last_paragraph(self, page_number):

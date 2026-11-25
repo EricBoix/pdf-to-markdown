@@ -14,6 +14,7 @@ from pdf_to_markdown import (
     PageLayout,
     Paragraph,
     ParagraphAndBlockquoteSplitter,
+    PartKind,
     ParagraphMerger,
     Sentence,
     TopLevelChapterOfParagraphs,
@@ -41,47 +42,47 @@ class TestParagraphAndBlockquoteSplitter:
             "   Second paragraph.\n"
         )
         parts = splitter.split(text)
-        assert [splitter.is_blockquote(part) for part in parts] == [
+        assert [part.kind is PartKind.BLOCKQUOTE for part in parts] == [
             False,
             True,
             False,
         ]
-        assert "The pull quote starts" in parts[1]
-        assert "and ends here." in parts[1]
-        assert parts[0].startswith("First paragraph")
-        assert parts[2].startswith("Second paragraph")
+        assert "The pull quote starts" in parts[1].text
+        assert "and ends here." in parts[1].text
+        assert parts[0].text.startswith("First paragraph")
+        assert parts[2].text.startswith("Second paragraph")
 
     def test_text_without_blockquote_is_split_like_paragraphs(self):
         splitter = self._splitter()
         parts = splitter.split("   One.\n   Two.\n")
         assert len(parts) == 2
-        assert not any(splitter.is_blockquote(part) for part in parts)
+        assert not any(part.kind is PartKind.BLOCKQUOTE for part in parts)
 
     def test_paragraph_beginning_is_not_a_blockquote(self):
         # Paragraphs begin with exactly three spaces (not four), and are not
         # preceded by a blank line.
         splitter = self._splitter()
         parts = splitter.split("Continuation.\n   New paragraph.\n   Another.\n")
-        assert not any(splitter.is_blockquote(part) for part in parts)
+        assert not any(part.kind is PartKind.BLOCKQUOTE for part in parts)
 
     def test_blockquote_at_the_top_of_a_page(self):
         splitter = self._splitter()
         parts = splitter.split(
             "    Quote at the top\n    of the page.\n\n   Then a paragraph.\n"
         )
-        assert [splitter.is_blockquote(part) for part in parts] == [True, False]
+        assert [part.kind is PartKind.BLOCKQUOTE for part in parts] == [True, False]
 
     def test_blockquote_at_the_bottom_of_a_page(self):
         splitter = self._splitter()
         parts = splitter.split("   A paragraph.\n\n    Quote at the bottom.\n")
-        assert [splitter.is_blockquote(part) for part in parts] == [False, True]
+        assert [part.kind is PartKind.BLOCKQUOTE for part in parts] == [False, True]
 
     def test_table_like_lines_are_not_a_blockquote(self):
         splitter = self._splitter()
         parts = splitter.split(
             "   Intro.\n\n    Left column          Right column\n\n   Outro.\n"
         )
-        assert not any(splitter.is_blockquote(part) for part in parts)
+        assert not any(part.kind is PartKind.BLOCKQUOTE for part in parts)
 
 
 class TestTextExtractionLeadingWhitespace:

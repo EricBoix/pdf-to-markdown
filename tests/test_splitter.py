@@ -40,7 +40,7 @@ class TestNameLessSinglePatternSplitter:
     def test_split_no_match_returns_original(self):
         splitter = NameLessSinglePatternSplitter(r"\n    ")
         result = splitter.split("No paragraph break here.")
-        assert result == ["No paragraph break here."]
+        assert [part.text for part in result] == ["No paragraph break here."]
 
     def test_split_at_start_removes_separator(self):
         # Separator at the very start: double-removal logic (lines 76-86 of
@@ -48,8 +48,8 @@ class TestNameLessSinglePatternSplitter:
         splitter = NameLessSinglePatternSplitter(r"\n    ")
         result = splitter.split("\n    First.\n    Second.")
         # The leading separator and empty string are both removed.
-        assert result[0] != ""
-        assert result[0] != "\n    "
+        assert result[0].text != ""
+        assert result[0].text != "\n    "
 
     def test_get_sublevel_name_returns_none(self):
         splitter = NameLessSinglePatternSplitter(r"\n    ")
@@ -59,8 +59,8 @@ class TestNameLessSinglePatternSplitter:
         splitter = NameLessSinglePatternSplitter(r"\n    ")
         result = splitter.split("First paragraph.\n    Second paragraph.")
         assert len(result) == 2
-        assert result[0] == "First paragraph."
-        assert result[1] == "Second paragraph."
+        assert result[0].text == "First paragraph."
+        assert result[1].text == "Second paragraph."
 
 
 class TestMultiplePatternSplitter:

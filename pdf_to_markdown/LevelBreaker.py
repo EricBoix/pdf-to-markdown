@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from .Model import (
@@ -9,6 +10,7 @@ from .Model import (
     Heading,
 )
 from .PageLayout import PageLayout
+from .Part import Part, PartKind
 from .TableRegistry import TableRegistry
 from .TextSanitizer import TextSanitizer
 from .DiagnosticsReporter import DiagnosticsReporter
@@ -16,17 +18,31 @@ from .Errors import ConverterError
 
 
 class Splitter(Protocol):
-    """Protocol for level splitters."""
+    """Protocol for level splitters.
 
-    def split(self, content_text: str) -> list[str]: ...
+    What split() returns depends on the level that is split:
+    - the splitter of a level of sub-chapters returns the text cut around the
+      names of the sub-chapters, as a list of str: the text standing before the
+      first name if any, then alternately the text holding a name and the text
+      of that sub-chapter;
+    - the splitter of a level of paragraphs returns a list of Parts (see
+      ParagraphAndBlockquoteSplitter).
+    """
+
+    def split(self, content_text: str) -> list[str] | list[Part]: ...
     def get_sublevel_name(self, content_text: str) -> str | None: ...
-    def is_blockquote(self, part_text: str) -> bool: ...
-    def is_table(self, part_text: str) -> bool: ...
-    def is_heading(self, part_text: str) -> bool: ...
 
 
 class ContentWithLayout(Protocol):
     """Protocol for content with page layout."""
+
+    text: str
+    page_layout: PageLayout
+
+
+@dataclass
+class TextWithLayout:
+    """Some text and the layout (the page) it comes from."""
 
     text: str
     page_layout: PageLayout
@@ -189,22 +205,21 @@ class LevelBreaker:
         remaining = parts[1:]
 
         if new_sublevel_type == Paragraph:
-            if self.level_splitter.is_table(parts[0]):
-                self._add_table(new_layout, current_level, parts[0])
+            part: Part = parts[0]
+            if part.kind is PartKind.TABLE:
+                self._add_table(new_layout, current_level, part.text)
                 return False, remaining
-            if self.level_splitter.is_heading(parts[0]):
-                self._add_heading(new_layout, current_level, parts[0])
+            if part.kind is PartKind.HEADING:
+                self._add_heading(new_layout, current_level, part.text)
                 return False, remaining
-            if not parts[0].strip():
+            if not part.text.strip():
                 self._diagnostics.warn("Skipping paragraph with empty text.")
                 return False, remaining
             paragraph_class = (
-                BlockQuoteParagraph
-                if self.level_splitter.is_blockquote(parts[0])
-                else Paragraph
+                BlockQuoteParagraph if part.kind is PartKind.BLOCKQUOTE else Paragraph
             )
             new_paragraph = paragraph_class(new_layout)
-            new_paragraph.append_text(parts[0])
+            new_paragraph.append_text(part.text)
             self.break_level(new_paragraph)
             current_level.add_sublevel(new_paragraph)
             return False, remaining
@@ -212,12 +227,7 @@ class LevelBreaker:
         if new_sublevel_type == SubChapterOfParagraphs:
             # Create a Paragraph directly in the SuperChapter instead of
             # a ChapterOfParagraphs containing a single paragraph.
-            class ParagraphContent:
-                pass
-
-            ParagraphContent.page_layout = new_layout
-            ParagraphContent.text = parts[0]
-            self.break_paragraphs(current_level, [ParagraphContent])
+            self.break_paragraphs(current_level, [TextWithLayout(parts[0], new_layout)])
             return (not remaining), remaining
 
         raise ConverterError(

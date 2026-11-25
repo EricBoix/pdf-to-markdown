@@ -25,7 +25,8 @@ from pdf_to_markdown import (
     TableRegistry,
     TableLayoutParser,
     TablePlaceholder,
-    TableText,
+    Part,
+    PartKind,
     TopLevelChapterOfParagraphs,
 )
 
@@ -263,14 +264,17 @@ class TestTableSplitting:
             + "\n   Second paragraph.\n"
         )
         parts = splitter.split(text)
-        assert [splitter.is_table(part) for part in parts] == [False, True, False]
-        assert parts[1] == "TABLE 4"
-        assert isinstance(parts[1], TableText)
+        assert [part.kind for part in parts] == [
+            PartKind.PARAGRAPH,
+            PartKind.TABLE,
+            PartKind.PARAGRAPH,
+        ]
+        assert parts[1] == Part(PartKind.TABLE, "TABLE 4")
 
     def test_text_without_placeholder_holds_no_table(self):
         splitter = ParagraphAndBlockquoteSplitter("\n   ", r"(?!x)x")
         parts = splitter.split("   Only a paragraph.\n")
-        assert not any(splitter.is_table(part) for part in parts)
+        assert not any(part.kind is PartKind.TABLE for part in parts)
 
 
 class TestTableMarkdown:

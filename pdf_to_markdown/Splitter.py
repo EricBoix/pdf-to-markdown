@@ -4,6 +4,7 @@ from typing import Protocol
 import logging
 
 from .Errors import ConverterError
+from .Part import Part, PartKind
 from .TablePlaceholder import TablePlaceholder
 
 
@@ -58,58 +59,8 @@ class ChapterSplitter:
         extracted_page.text = extracted_page.text.removeprefix(chapter_name)
 
 
-class BlockquoteText(str):
-    """The text of a part, produced by a splitter, that is a blockquote.
-
-    This is a plain str (the splitters return lists of str) whose only purpose
-    is to carry the information "this part is a blockquote" along with the
-    text, see Splitter.is_blockquote().
-    """
-
-
-class TableText(str):
-    """The text of a part, produced by a splitter, that stands for a table.
-
-    The text is the name of the table, as found in the TablePlaceholder that
-    the TableExtractor left in the text of the page. Like BlockquoteText it is
-    a plain str that carries the information "this part is a table" along
-    with the text, see Splitter.is_table().
-    """
-
-
-class HeadingText(str):
-    """The text of a part, produced by a splitter, that is a heading: the title
-    of a sub-section that the hierarchy of levels has no level for.
-
-    Like BlockquoteText it is a plain str that carries the information "this
-    part is a heading" along with the text (the title), see
-    Splitter.is_heading().
-    """
-
-
 class Splitter:
     _logger = logging.getLogger("pdf_to_markdown")
-
-    def is_blockquote(self, part_text) -> bool:
-        """Whether a part returned by split() is a blockquote (and not e.g. a paragraph).
-
-        Splitters that do not detect blockquotes never return one.
-        """
-        return False
-
-    def is_table(self, part_text) -> bool:
-        """Whether a part returned by split() stands for a table (and not e.g. a paragraph).
-
-        Splitters that do not detect tables never return one.
-        """
-        return False
-
-    def is_heading(self, part_text) -> bool:
-        """Whether a part returned by split() is a heading (and not e.g. a paragraph).
-
-        Splitters that do not detect headings never return one.
-        """
-        return False
 
     def _find_first_match(self, patterns, content_text) -> re.Match[str] | None:
         """Return first regex match across patterns, or None."""
@@ -250,10 +201,14 @@ class NameLessSinglePatternSplitter(SinglePatternSplitter):
     def __init__(self, breaking_pattern) -> None:
         SinglePatternSplitter.__init__(self, breaking_pattern, "dummy_pattern")
 
-    def split(self, content_text) -> list[str]:
-        return Splitter._split_on_single_pattern(
-            self, self.breaking_pattern, content_text, remove_separator=True
-        )
+    def split(self, content_text) -> list[Part]:
+        """The paragraphs of the text, as parts of the PARAGRAPH kind."""
+        return [
+            Part(PartKind.PARAGRAPH, paragraph_text)
+            for paragraph_text in Splitter._split_on_single_pattern(
+                self, self.breaking_pattern, content_text, remove_separator=True
+            )
+        ]
 
     def get_sublevel_name(self, dummy_content_text) -> str | None:
         return None
@@ -290,17 +245,8 @@ class ParagraphAndBlockquoteSplitter(NameLessSinglePatternSplitter):
             re.compile(heading_pattern) if heading_pattern is not None else None
         )
 
-    def is_blockquote(self, part_text) -> bool:
-        return isinstance(part_text, BlockquoteText)
-
-    def is_heading(self, part_text) -> bool:
-        return isinstance(part_text, HeadingText)
-
-    def is_table(self, part_text) -> bool:
-        return isinstance(part_text, TableText)
-
-    def split(self, content_text) -> list[str]:
-        """Breaks a text into paragraphs, blockquotes and tables.
+    def split(self, content_text) -> list[Part]:
+        """Breaks a text into paragraphs, blockquotes, headings and tables.
 
         The tables are cut out first: each TablePlaceholder (see
         TableExtractor) is a table part, whatever surrounds it.
@@ -311,12 +257,12 @@ class ParagraphAndBlockquoteSplitter(NameLessSinglePatternSplitter):
             parts += self._split_into_paragraphs_and_blockquotes(
                 content_text[position : table_match.start()]
             )
-            parts.append(TableText(table_match.group("table_name")))
+            parts.append(Part(PartKind.TABLE, table_match.group("table_name")))
             position = table_match.end()
         parts += self._split_into_paragraphs_and_blockquotes(content_text[position:])
         return parts
 
-    def _split_into_paragraphs_and_blockquotes(self, content_text) -> list[str]:
+    def _split_into_paragraphs_and_blockquotes(self, content_text) -> list[Part]:
         if self.heading_pattern is None:
             return self._split_around_blockquotes(content_text)
         parts = []
@@ -326,13 +272,13 @@ class ParagraphAndBlockquoteSplitter(NameLessSinglePatternSplitter):
             parts += self._split_after_heading(
                 content_text[position : match.start()], follows_heading
             )
-            parts.append(HeadingText(match.group(1)))
+            parts.append(Part(PartKind.HEADING, match.group(1)))
             position = match.end()
             follows_heading = True
         parts += self._split_after_heading(content_text[position:], follows_heading)
         return parts
 
-    def _split_after_heading(self, text, follows_heading) -> list[str]:
+    def _split_after_heading(self, text, follows_heading) -> list[Part]:
         # The text following a heading starts like the text of a page does:
         # without the separator of its first paragraph (the heading pattern
         # holds the blank lines) and, unless it is a blockquote (recognized
@@ -341,17 +287,17 @@ class ParagraphAndBlockquoteSplitter(NameLessSinglePatternSplitter):
             text = text.lstrip(" ")
         return self._split_around_blockquotes(text)
 
-    def _split_around_blockquotes(self, content_text) -> list[str]:
+    def _split_around_blockquotes(self, content_text) -> list[Part]:
         parts = []
         position = 0
         for match in self.blockquote_pattern.finditer(content_text):
             parts += self._split_into_paragraphs(content_text[position : match.start()])
-            parts.append(BlockquoteText(match.group(1)))
+            parts.append(Part(PartKind.BLOCKQUOTE, match.group(1)))
             position = match.end()
         parts += self._split_into_paragraphs(content_text[position:])
         return parts
 
-    def _split_into_paragraphs(self, text_without_blockquote) -> list[str]:
+    def _split_into_paragraphs(self, text_without_blockquote) -> list[Part]:
         # The text following a blockquote starts with the separator of the
         # next paragraph. It carries no information and
         # _split_on_single_pattern() only copes with such a leading separator

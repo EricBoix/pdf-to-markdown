@@ -13,7 +13,8 @@ from pdf_to_markdown import (
     Document,
     ExtractedPage,
     Heading,
-    HeadingText,
+    Part,
+    PartKind,
     NumberedListAnnotator,
     PageLayout,
     Paragraph,
@@ -47,16 +48,18 @@ class TestHeadingSplitting:
             + "   Second paragraph.\n"
         )
         parts = self._split(text)
-        assert parts == ["First paragraph.", "A Centered Title", "Second paragraph.\n"]
-        splitter = ParagraphAndBlockquoteSplitter(
-            PARAGRAPH_BREAKING_PATTERN, BLOCKQUOTE_PATTERN, HEADING_PATTERN
-        )
-        assert [splitter.is_heading(part) for part in parts] == [False, True, False]
-        assert isinstance(parts[1], HeadingText)
+        assert parts == [
+            Part(PartKind.PARAGRAPH, "First paragraph."),
+            Part(PartKind.HEADING, "A Centered Title"),
+            Part(PartKind.PARAGRAPH, "Second paragraph.\n"),
+        ]
 
     def test_heading_at_the_very_beginning_of_the_text(self):
         text = CENTERING + "A Centered Title\n\n\n\n\n" + "   A paragraph.\n"
-        assert self._split(text) == ["A Centered Title", "A paragraph.\n"]
+        assert self._split(text) == [
+            Part(PartKind.HEADING, "A Centered Title"),
+            Part(PartKind.PARAGRAPH, "A paragraph.\n"),
+        ]
 
     def test_blockquote_following_a_heading_is_still_a_blockquote(self):
         text = (
@@ -71,25 +74,29 @@ class TestHeadingSplitting:
             PARAGRAPH_BREAKING_PATTERN, BLOCKQUOTE_PATTERN, HEADING_PATTERN
         )
         parts = splitter.split(text)
-        assert parts[:2] == ["A paragraph.", "A Title"]
-        assert splitter.is_blockquote(parts[2])
-        assert parts[2] == "    A pull quote line.\n    Another line.\n"
-        assert parts[3].strip() == "Next paragraph."
+        assert parts[:2] == [
+            Part(PartKind.PARAGRAPH, "A paragraph."),
+            Part(PartKind.HEADING, "A Title"),
+        ]
+        assert parts[2] == Part(
+            PartKind.BLOCKQUOTE, "    A pull quote line.\n    Another line.\n"
+        )
+        assert parts[3].text.strip() == "Next paragraph."
 
     def test_line_followed_by_fewer_blank_lines_is_not_a_heading(self):
         text = "   First.\n" + CENTERING + "Not A Title\n\n   Second.\n"
         parts = self._split(text)
-        assert not any(isinstance(part, HeadingText) for part in parts)
+        assert not any(part.kind is PartKind.HEADING for part in parts)
 
     def test_all_capital_line_is_not_a_heading(self):
         text = "   First.\n" + CENTERING + "ALL CAPITALS\n\n\n\n\n   Second.\n"
         parts = self._split(text)
-        assert not any(isinstance(part, HeadingText) for part in parts)
+        assert not any(part.kind is PartKind.HEADING for part in parts)
 
     def test_without_heading_pattern_nothing_changes(self):
         text = "   First.\n" + CENTERING + "A Centered Title\n\n\n\n\n   Second.\n"
         parts = self._split(text, heading_pattern=None)
-        assert not any(isinstance(part, HeadingText) for part in parts)
+        assert not any(part.kind is PartKind.HEADING for part in parts)
 
 
 class TestHeadingMarkdown:

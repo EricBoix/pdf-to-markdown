@@ -41,10 +41,8 @@ from .Splitter import (
     MultiplePatternSplitter,
     NameLessSinglePatternSplitter,
     ParagraphAndBlockquoteSplitter,
-    BlockquoteText,
-    HeadingText,
-    TableText,
 )
+from .Part import Part, PartKind
 from .TableDeclaration import TableDeclaration
 from .TableExtractor import TableExtractor
 from .TableLayoutParser import TableLayoutParser

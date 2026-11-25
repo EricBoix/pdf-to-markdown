@@ -222,16 +222,17 @@ class StructuralInfoBase(ABC):
         fixes = typo_and_fix if isinstance(typo_and_fix, list) else [typo_and_fix]
         for fix_entry in fixes:
             typo = fix_entry[self.KEY_TYPO]
-            if not re.search(typo, extracted_page.text):
+            fixed_text, substitution_count = re.subn(
+                typo, fix_entry[self.KEY_FIX], extracted_page.text
+            )
+            if substitution_count == 0:
                 self._diagnostics.warn(
                     f"Couldn't find typo in extracted page number {page_number}:"
                 )
                 self._diagnostics.warn(f"  - typo: {typo}")
                 self._diagnostics.warn(f"  - page text: {extracted_page.text}")
                 continue
-            extracted_page.text = re.sub(
-                typo, fix_entry[self.KEY_FIX], extracted_page.text
-            )
+            extracted_page.text = fixed_text
             self._diagnostics.debug(f"Typo fixed on page {page_number}")
 
     def _get_page_number_finishing_last_paragraph(self, page_number) -> int:

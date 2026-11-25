@@ -3,8 +3,11 @@
 from pdf_to_markdown import (
     ConverterBase,
     Document,
+    DocumentWithSubChapters,
     NameLessSinglePatternSplitter,
+    SinglePatternSplitter,
     StructuralInfoBase,
+    SuperChapter,
     TopLevelChapterOfParagraphs,
 )
 
@@ -62,4 +65,39 @@ def build_fixture_document(pdf_path: str) -> Document:
     document = Document("Fixture Document")
     structural_info = FixtureStructuralInfo()
     FixtureConverter(pdf_path, document, structural_info)
+    return document
+
+
+class SuperChapterFixtureStructuralInfo(FixtureStructuralInfo):
+    """5-page fixture: pages 0 and 3 are super chapter headings, the pages in
+    between hold numbered sub-chapters ("1. Alpha" ...)."""
+
+    @property
+    def pages_info(self) -> dict:
+        return {
+            0: {"type": "chapter", "chapter_info": {"name": "Part One"}},
+            3: {"type": "chapter", "chapter_info": {"name": "Part Two"}},
+        }
+
+    @property
+    def total_page_number(self) -> int:
+        return 5
+
+    def superchapter_to_chapter_splitter(self):
+        # A sub-chapter starts with e.g. "1. Alpha" followed by blank lines.
+        return SinglePatternSplitter(r"\d+\. [A-Za-z ]+\n+", r"[A-Za-z ]+")
+
+
+class SuperChapterFixtureConverter(ConverterBase):
+    """Concrete converter for the 5-page super chapter fixture PDF."""
+
+    def break_document_into_chapters(self):
+        ConverterBase.break_document_into_chapters(self, SuperChapter)
+
+
+def build_superchapter_fixture_document(pdf_path: str) -> DocumentWithSubChapters:
+    """Run the full pipeline on the super chapter fixture PDF."""
+    document = DocumentWithSubChapters("Fixture Document")
+    structural_info = SuperChapterFixtureStructuralInfo()
+    SuperChapterFixtureConverter(pdf_path, document, structural_info)
     return document

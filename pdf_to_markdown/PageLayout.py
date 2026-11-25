@@ -13,14 +13,12 @@ class PageLayout:
             self._page_number = page_number
         elif isinstance(reader_page_number, str):
             self._page_number = int(page_number)
-        self._reference_text = "DUMMY UNDEFINED VALUE"
 
     def __copy__(self) -> "PageLayout":
         cls = self.__class__
         result = cls.__new__(cls)
         result._reader_page_number = self._reader_page_number
         result._page_number = self._page_number
-        result._reference_text = self._reference_text
         return result
 
     @property

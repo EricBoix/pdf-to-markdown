@@ -43,14 +43,14 @@ SENTENCE_CHARACTER_EXAMPLES = [
 ]
 
 # Stage: sentence splitting (paragraph -> sentences)
-# split_paragraph_respecting_quotes passes each sentence through unchanged.
+# frame_sentences_if_unbalanced passes each sentence through unchanged.
 # Each entry of SENTENCE_SPLIT_EXAMPLES is a triple:
 #   (paragraph_text, sanitized_sentences_in, expected_sentences_out)
 #  where
 #    - paragraph_text: the original document text;
 #    - sanitized_sentences_in: what NLTK tokenisation + sanitize_characters
 #      produces; 
-#    - expected_sentences_out: what split_paragraph_respecting_quotes
+#    - expected_sentences_out: what frame_sentences_if_unbalanced
 #      must return.  
 # The triple shape is kept so that the test makes the passthrough contract
 # explicit: 
@@ -62,7 +62,7 @@ SENTENCE_CHARACTER_EXAMPLES = [
 _apos = "\u0027"  # U+0027 ASCII APOSTROPHE
 _lsqm = "\u2018"  # U+2018 LEFT SINGLE QUOTATION MARK
 _rsqm = "\u2019"  # U+2019 RIGHT SINGLE QUOTATION MARK
-# All entries below are valid source text; split_paragraph_respecting_quotes
+# All entries below are valid source text; frame_sentences_if_unbalanced
 # passes them through unchanged.
 SENTENCE_SPLIT_EXAMPLES = [
     # Multi-sentence paragraph enclosed in typographic single quotes.

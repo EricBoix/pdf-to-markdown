@@ -274,9 +274,7 @@ class TextSanitizer:
         return sentence
 
     @staticmethod
-    def split_paragraph_respecting_quotes(
-        paragraph_text: str, sanitized_sentences: list[str]
-    ) -> list[str]:
+    def frame_sentences_if_unbalanced(sanitized_sentences: list[str]) -> list[str]:
         """Pass sentences through, framing any that contain a word-terminal apostrophe.
 
         NLTK-split fragments from singly-quoted paragraphs (e.g. 'It is overfull.

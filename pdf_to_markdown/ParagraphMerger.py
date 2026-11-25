@@ -35,9 +35,7 @@ class ParagraphMerger:
         self, structural_info, diagnostics: DiagnosticsReporter | None = None
     ) -> None:
         self.structural_info = structural_info
-        self._diagnostics = (
-            diagnostics if diagnostics is not None else DiagnosticsReporter()
-        )
+        self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
 
     def _page_requires_paragraph_continuation(self, page_number: int) -> bool:
         if page_number not in self.structural_info.pages_info:

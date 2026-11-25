@@ -25,8 +25,6 @@ from .BlockquoteDeduplicator import BlockquoteDeduplicator
 from .SectionDropper import SectionDropper
 from .TableRegistry import SpanningCellText
 
-nltk.download("punkt_tab", quiet=True)
-
 
 class ContentWithLayout(Protocol):
     """Protocol for content with page layout."""
@@ -46,9 +44,7 @@ class DocumentBuilder(TextSanitizer, ABC):
     ) -> None:
         self.document = document
         self.structural_info = structural_info
-        self._diagnostics = (
-            diagnostics if diagnostics is not None else DiagnosticsReporter()
-        )
+        self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
         self._paragraph_merger = ParagraphMerger(
             structural_info, diagnostics=self._diagnostics
         )
@@ -103,10 +99,10 @@ class DocumentBuilder(TextSanitizer, ABC):
         ]
         # Boundary apostrophes from sentence splitting are preserved as-is.
         # They are meaningful fragments of the original quotation and must not
-        # be stripped or re-injected. See TextSanitizer.split_paragraph_respecting_quotes
+        # be stripped or re-injected. See TextSanitizer.frame_sentences_if_unbalanced
         # for the full rationale.
-        final_sentences = TextSanitizer.split_paragraph_respecting_quotes(
-            paragraph_text, sanitized_sentences
+        final_sentences = TextSanitizer.frame_sentences_if_unbalanced(
+            sanitized_sentences
         )
         for new_sentence_text in final_sentences:
             if not new_sentence_text:
@@ -178,12 +174,3 @@ class DocumentBuilder(TextSanitizer, ABC):
             handler(level)
             return
         raise ConverterError(f"Level of type {type(level)} has no break handler.")
-
-    def break_sublevels(self, level: DocumentHierarchicalLevel) -> None:
-        """Assuming this level was already broken into sublevels, recurse the breaking on its sublevels"""
-        sublevels = level.get_sublevels()
-        if not sublevels:
-            raise ConverterError("Level without sublevels. Nothing to be done.")
-            return
-        for sublevel in sublevels:
-            self.break_level(sublevel)

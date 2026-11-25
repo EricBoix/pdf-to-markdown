@@ -32,9 +32,7 @@ class TableExtractor:
         self, structural_info, diagnostics: DiagnosticsReporter | None = None
     ) -> None:
         self._structural_info = structural_info
-        self._diagnostics = (
-            diagnostics if diagnostics is not None else DiagnosticsReporter()
-        )
+        self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
         self._declarations = structural_info.table_declarations
         self._registry = structural_info.table_registry
         self._parser = TableLayoutParser(self._diagnostics)

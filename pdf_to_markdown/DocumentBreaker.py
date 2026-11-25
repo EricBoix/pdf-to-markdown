@@ -25,7 +25,7 @@ class DocumentBreaker:
     ) -> None:
         self.document = document
         self.structural_info = structural_info
-        self._diagnostics = diagnostics if diagnostics is not None else DiagnosticsReporter()
+        self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
         self.chapter_splitter = structural_info.get_chapter_splitter()
 
         # Parse PDF and validate

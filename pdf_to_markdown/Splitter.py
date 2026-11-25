@@ -119,12 +119,6 @@ class Splitter:
                 return match
         return None
 
-    def _extract_sublevel_name(self, patterns, content_text) -> str | None:
-        match = self._find_first_match(patterns, content_text)
-        if match:
-            return re.sub(match.re.pattern, "", content_text)
-        raise ConverterError("Unable to extract chapter name.")
-
     def _holds_new_sublevels(self, patterns, content_text) -> bool:
         return self._find_first_match(patterns, content_text) is not None
 
@@ -249,13 +243,6 @@ class MultiplePatternSplitter(Splitter):
             content_text,
         )
 
-    def extract_sublevel_name(self, content_text) -> str | None:
-        return Splitter._extract_sublevel_name(
-            self,
-            self.breaking_patterns,
-            content_text,
-        )
-
 
 class NameLessSinglePatternSplitter(SinglePatternSplitter):
     """When breaking paragraphs into sentences there is no need to extract a name for the Sentence structural element."""
@@ -270,9 +257,6 @@ class NameLessSinglePatternSplitter(SinglePatternSplitter):
 
     def get_sublevel_name(self, dummy_content_text) -> str | None:
         return None
-
-    def extract_sublevel_name(self, dummy_content_text) -> None:
-        return
 
 
 class ParagraphAndBlockquoteSplitter(NameLessSinglePatternSplitter):

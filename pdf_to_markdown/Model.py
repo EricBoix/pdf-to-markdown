@@ -96,12 +96,6 @@ class Sentence(Numbered, Parent):
         has_verb = any(tag.startswith("VB") for _, tag in tagged)
         return has_verb
 
-    def to_markdown(self, md_file: MdUtils, dummy_level) -> None:
-        """
-        Add this sentence's content to the given MdUtils object.
-        """
-        md_file.new_line(repr(self.text))
-
     def get_document_reference_long(self) -> str:
         # Paragraphs are nameless so we must grab the grand-parent
         owner_name = (
@@ -205,6 +199,28 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
 
     def has_page_number(self, page_number) -> bool:
         return self.page_layout.page_number == page_number
+
+    def _get_document_reference_long_of_owned_level(self, reference_start: str) -> str:
+        """The reference within the document of a level that is owned by another
+        level, for human consumption: the given start of the reference, then
+        the name of the owning level and the pages of this level."""
+        owner_name = (
+            self.owning_hierarchical_level.name
+            if self.owning_hierarchical_level
+            else "unknown"
+        )
+        page_reader = self.page_layout.reader_page_number if self.page_layout else "?"
+        page_num = self.page_layout.page_number if self.page_layout else "?"
+        return (
+            reference_start
+            # Just to add parentheses
+            + repr(owner_name)
+            + ", page "
+            + str(page_reader)
+            + " (index page number "
+            + str(page_num)
+            + ")"
+        )
 
     def get_first_sublevel_of_given_page(self, page_number) -> T | None:
         for sublevel in self.sublevels:
@@ -358,24 +374,8 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
 
     def get_document_reference_long(self) -> str:
         # A reference within the document for human consumption.
-        owner_name = (
-            self.owning_hierarchical_level.name
-            if self.owning_hierarchical_level
-            else "unknown"
-        )
-        page_reader = self.page_layout.reader_page_number if self.page_layout else "?"
-        page_num = self.page_layout.page_number if self.page_layout else "?"
-        return (
-            "Paragraph "
-            + str(self._number)
-            + " of subchapter "
-            # Just to add parentheses
-            + repr(owner_name)
-            + ", page "
-            + str(page_reader)
-            + " (index page number "
-            + str(page_num)
-            + ")"
+        return self._get_document_reference_long_of_owned_level(
+            "Paragraph " + str(self._number) + " of subchapter "
         )
 
     def to_markdown(self, md_file: MdUtils, dummy_level) -> None:
@@ -598,22 +598,8 @@ class TopLevelChapterOfParagraphs(
 
     def get_document_reference_long(self) -> str:
         """A reference within the document for human consumption."""
-        owner_name = (
-            self.owning_hierarchical_level.name
-            if self.owning_hierarchical_level
-            else "unknown"
-        )
-        page_reader = self.page_layout.reader_page_number if self.page_layout else "?"
-        page_num = self.page_layout.page_number if self.page_layout else "?"
-        return (
-            "Chapter "
-            + str(self._number)
-            + repr(owner_name)
-            + ", page "
-            + str(page_reader)
-            + " (index page number "
-            + str(page_num)
-            + ")"
+        return self._get_document_reference_long_of_owned_level(
+            "Chapter " + str(self._number)
         )
 
 
@@ -628,22 +614,8 @@ class SubChapterOfParagraphs(DocumentHierarchicalLevel[Paragraph]):
 
     def get_document_reference_long(self) -> str:
         """A reference within the document for human consumption."""
-        owner_name = (
-            self.owning_hierarchical_level.name
-            if self.owning_hierarchical_level
-            else "unknown"
-        )
-        page_reader = self.page_layout.reader_page_number if self.page_layout else "?"
-        page_num = self.page_layout.page_number if self.page_layout else "?"
-        return (
-            "SubChapter "
-            + str(self._number)
-            + repr(owner_name)
-            + ", page "
-            + str(page_reader)
-            + " (index page number "
-            + str(page_num)
-            + ")"
+        return self._get_document_reference_long_of_owned_level(
+            "SubChapter " + str(self._number)
         )
 
 
@@ -723,27 +695,24 @@ class DocumentHierarchicalRoot:
         md_file.create_md_file()
 
 
-class Document(
-    DocumentHierarchicalRoot, DocumentHierarchicalLevel[TopLevelChapterOfParagraphs]
-):
+class DocumentOfChapters(DocumentHierarchicalRoot, DocumentHierarchicalLevel[T]):
+    """A document whose chapters are of the type parameter T."""
+
+    DOCUMENT_LEVEL_NAME: str
+
     def __init__(
         self, title: str, publication_info: "PublicationInfo | None" = None
     ) -> None:
         DocumentHierarchicalRoot.__init__(self, title, publication_info)
-        DocumentHierarchicalLevel.__init__(self, "Document")
+        DocumentHierarchicalLevel.__init__(self, self.DOCUMENT_LEVEL_NAME)
 
     add_chapter = DocumentHierarchicalLevel.add_sublevel
     get_chapters = DocumentHierarchicalLevel.get_sublevels
 
 
-class DocumentWithSubChapters(
-    DocumentHierarchicalRoot, DocumentHierarchicalLevel[SuperChapter]
-):
-    def __init__(
-        self, title: str, publication_info: "PublicationInfo | None" = None
-    ) -> None:
-        DocumentHierarchicalRoot.__init__(self, title, publication_info)
-        DocumentHierarchicalLevel.__init__(self, "DocumentWithSubChapters")
+class Document(DocumentOfChapters[TopLevelChapterOfParagraphs]):
+    DOCUMENT_LEVEL_NAME = "Document"
 
-    add_chapter = DocumentHierarchicalLevel.add_sublevel
-    get_chapters = DocumentHierarchicalLevel.get_sublevels
+
+class DocumentWithSubChapters(DocumentOfChapters[SuperChapter]):
+    DOCUMENT_LEVEL_NAME = "DocumentWithSubChapters"

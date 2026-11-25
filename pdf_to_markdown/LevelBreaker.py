@@ -55,9 +55,7 @@ class LevelBreaker:
         self.sublevel_factory = sublevel_factory
         self.break_level = break_level_callback
         self.break_paragraphs = break_paragraphs_callback
-        self._diagnostics = (
-            diagnostics if diagnostics is not None else DiagnosticsReporter()
-        )
+        self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
         self._table_registry = table_registry
 
     def break_into_sublevels(
@@ -225,4 +223,3 @@ class LevelBreaker:
         raise ConverterError(
             f"Expected Paragraph or ChapterOfParagraphs, got {new_sublevel_type}"
         )
-        return False, parts

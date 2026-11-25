@@ -14,9 +14,7 @@ class TableLayoutParser:
     """
 
     def __init__(self, diagnostics: DiagnosticsReporter | None = None) -> None:
-        self._diagnostics = (
-            diagnostics if diagnostics is not None else DiagnosticsReporter()
-        )
+        self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
 
     def parse(
         self, fragment_text: str, declaration: TableDeclaration

@@ -2,8 +2,8 @@
 
 Two distinct contexts live here:
   - Character sanitization: folding of non-ASCII chars in sentence text.
-  - Sentence splitting: split_paragraph_respecting_quotes passes sentences
-    through unchanged (TextSanitizer.split_paragraph_respecting_quotes).
+  - Sentence splitting: frame_sentences_if_unbalanced passes sentences
+    through unchanged (TextSanitizer.frame_sentences_if_unbalanced).
 
 Examples for each context are imported from fixtures/text_examples.py to
 prevent accidental cross-stage mixing.
@@ -37,7 +37,7 @@ class TestCharacterSanitization:
 
 
 class TestSentenceSplitting:
-    """TextSanitizer.split_paragraph_respecting_quotes."""
+    """TextSanitizer.frame_sentences_if_unbalanced."""
 
     @pytest.mark.parametrize(
         "paragraph_text,sanitized_sentences,expected_sentences",
@@ -46,13 +46,11 @@ class TestSentenceSplitting:
     def test_split_paragraph_frames_unbalanced_quotes(
         self, paragraph_text, sanitized_sentences, expected_sentences
     ):
-        result = TextSanitizer.split_paragraph_respecting_quotes(
-            paragraph_text, sanitized_sentences
-        )
+        result = TextSanitizer.frame_sentences_if_unbalanced(sanitized_sentences)
         assert result == expected_sentences
 
     def test_empty_sentence_list_returns_empty(self):
-        result = TextSanitizer.split_paragraph_respecting_quotes("Any text.", [])
+        result = TextSanitizer.frame_sentences_if_unbalanced([])
         assert result == []
 
 

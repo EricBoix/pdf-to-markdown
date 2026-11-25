@@ -28,9 +28,7 @@ class SectionDropper:
         diagnostics: DiagnosticsReporter | None = None,
     ) -> None:
         self._structural_info = structural_info
-        self._diagnostics = (
-            diagnostics if diagnostics is not None else DiagnosticsReporter()
-        )
+        self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
         # The (casefolded) dropped titles that were met in the document
         self._matched_titles: set[str] = set()
 

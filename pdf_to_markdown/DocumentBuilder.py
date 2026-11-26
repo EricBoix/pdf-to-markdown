@@ -65,12 +65,14 @@ class DocumentBuilder(TextSanitizer, ABC):
         # Dropping the sections first prevents a paragraph from being glued to
         # the text of a dropped section.
         self._section_dropper.drop_sections(self.document)
+        # The blockquotes first: when a paragraph is merged the blockquotes
+        # between its halves are moved, they must then be whole.
         for top_level_chapter in self.document.get_chapters():
-            self._paragraph_merger.reconstitute_paragraphs_spreading_over_two_pages(
+            self._paragraph_merger.reconstitute_blockquotes_spreading_over_two_pages(
                 top_level_chapter
             )
         for top_level_chapter in self.document.get_chapters():
-            self._paragraph_merger.reconstitute_blockquotes_spreading_over_two_pages(
+            self._paragraph_merger.reconstitute_paragraphs_spreading_over_two_pages(
                 top_level_chapter
             )
         # Once the paragraphs spreading over two pages are reconstituted the
@@ -102,9 +104,7 @@ class DocumentBuilder(TextSanitizer, ABC):
         """A table is not broken into sentences: its cell texts are sanitized."""
 
         def sanitize_cell(cell_text: str) -> str:
-            sanitized_text = self.normalize_newlines_and_multiple_whitespaces(
-                cell_text
-            )
+            sanitized_text = self.normalize_newlines_and_multiple_whitespaces(cell_text)
             if isinstance(cell_text, SpanningCellText):
                 return SpanningCellText(sanitized_text)
             return sanitized_text

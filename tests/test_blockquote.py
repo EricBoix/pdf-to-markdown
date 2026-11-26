@@ -222,7 +222,9 @@ class TestParagraphMergerIgnoresBlockquotes:
         blockquote = _paragraph(BlockQuoteParagraph, 1, "A complete quote.")
         ending = _paragraph(Paragraph, 2, "clear and deep.")
         merged = self._merge(beginning, blockquote, ending)
-        assert merged == [beginning, blockquote]
+        # The quote of the first page moves before the merged paragraph (see
+        # test_blockquote_page_order.py)
+        assert merged == [blockquote, beginning]
         assert [sentence.text for sentence in beginning.get_sentences()] == [
             "It is calm.",
             "The mind is very clear and deep.",

@@ -160,6 +160,11 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         self.sublevels.append(sublevel)
         sublevel.set_owning_hierarchical_level(self)
 
+    def move_sublevel_before(self, sublevel: T, reference_sublevel: T) -> None:
+        """Move a sublevel of this level right before another sublevel of it."""
+        self.sublevels.remove(sublevel)
+        self.sublevels.insert(self.sublevels.index(reference_sublevel), sublevel)
+
     def get_sublevel(self, index: int) -> T:
         if not self.sublevels or index >= len(self.sublevels):
             raise ConverterError(

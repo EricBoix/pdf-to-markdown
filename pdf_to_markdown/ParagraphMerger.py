@@ -205,6 +205,41 @@ class ParagraphMerger:
             sibling_texts, ill_starting_paragraph.get_markdown_text()
         )
 
+    @staticmethod
+    def _move_blockquotes_between_before(
+        ill_ending_paragraph: Paragraph, ill_starting_paragraph: Paragraph
+    ) -> None:
+        """Keep the pages of the document in order around a merged paragraph.
+
+        A pull quote of the page that ends the paragraph often stands between
+        the two halves (e.g. at the bottom of the page). Once the halves are
+        merged into the paragraph that precedes the quote, the quote would
+        come after text of the next page. A blockquote lying between the two
+        halves, that lies entirely on the first page of the paragraph (or on
+        an earlier one), is thus moved right before the paragraph: its pages
+        then precede (or equal) every page of the paragraph. A blockquote that
+        reaches a later page (e.g. one cut by a page break as the paragraph
+        is) is left in place: no order of the two keeps the pages in order.
+        """
+        if isinstance(ill_ending_paragraph, BlockQuoteParagraph):
+            return
+        owner = ill_ending_paragraph._owning_hierarchical_level
+        sublevels = owner.get_sublevels()
+        between = sublevels[
+            sublevels.index(ill_ending_paragraph)
+            + 1 : sublevels.index(ill_starting_paragraph)
+        ]
+        first_page_number = ill_ending_paragraph.get_sentences()[
+            0
+        ].page_layout.page_number
+        for sublevel in between:
+            if isinstance(sublevel, BlockQuoteParagraph) and all(
+                sentence.page_layout.page_number <= first_page_number
+                for sentence in sublevel.get_sentences()
+            ):
+                owner.move_sublevel_before(sublevel, ill_ending_paragraph)
+        owner.renumber_sublevels()
+
     def _merge_across_page_break(
         self,
         ill_ending_paragraph: Paragraph,
@@ -250,6 +285,10 @@ class ParagraphMerger:
                 f"(starts with: {ill_starting_paragraph.get_sentences()[0].text[:60]!r}), because they are not siblings."
             )
             return
+
+        self._move_blockquotes_between_before(
+            ill_ending_paragraph, ill_starting_paragraph
+        )
 
         # Proceed with the merging
         first_sentence_of_ill_starting_paragraph = (

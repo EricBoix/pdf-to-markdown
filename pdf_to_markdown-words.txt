@@ -6,12 +6,14 @@ metta
 blockquotes
 Deduplicator
 fileutils
+importlib
 mdutils
 nltk
 pandoc
 pycache
 pypandoc
 pypdf
+pyproject
 pytest
 setuptools
 venv

@@ -35,22 +35,6 @@ Print the version of what is installed (also inside a converter image):
 python -c "import importlib.metadata as m; print(m.version('pdf-to-markdown'))"
 ```
 
-## Testing a change against the jejune documents
-
-Before pushing anything, check a change against every `jejune_doc_*` converter
-(see `jejune converters build --help` in `jejune_cli`):
-
-1. **Commit locally, do not push.** The version above then carries the commit
-   (`+g<sha>`), which identifies exactly what was tested. Uncommitted changes make
-   different test runs look alike (same version, only the date differs).
-   A rejected local commit costs nothing: `git reset` it, GitHub never saw it.
-2. `jejune converters build --local-pdf-to-markdown` (or `--local`)
-3. `jejune converters test --no-build` (without `--no-build` the images are rebuilt
-   with the locked pdf-to-markdown).
-
-The `.git` directory is part of what `jejune converters build` copies into the image
-(see `.dockerignore`): it is what makes the version available there.
-
 ## Package testing
 
 ```bash
@@ -71,6 +55,27 @@ Extracting structure from PDFs requires inferring regex patterns for chapters, s
 3. Test patterns with [regex101](https://regex101.com/) (select Python)
 4. Implement patterns using `pdf_to_markdown.Splitter`
 
+## Features
+
+### Debug comments and page markers
+
+The markdown can carry html comments telling what the converter did (off by
+default, for a clean markdown): the page markers `<!-- page reader=iv pdf=4 -->`
+(`reader`: number printed on the page, `pdf`: PDF viewer page, first is 1), the
+markdownlint guards (`<!-- markdownlint-disable-line MD026 -->`) and the
+converter notes (`<!-- Converter note: ... -->`). Setting
+`PDF_TO_MARKDOWN_DEBUG_COMMENTS=1` switches them all on without changing the
+converter.
+
+- A sentence belongs to the page where it starts. Between blocks a marker is a
+  paragraph of its own; within a paragraph it is on a line of its own (one
+  newline before and after, no blank line: paragraph and sentence counts are
+  unchanged). `page_markers_on_own_line=False` glues it to the previous
+  sentence instead.
+- `document.to_markdown(path, page_markers=True/False)` overrides the switch. A
+  document read from a markdown (`MarkdownToDocument`) has no pages, hence no
+  markers by default.
+
 ## Model class diagram
 
 ```mermaid
@@ -78,22 +83,34 @@ classDiagram
   namespace SemanticDocument {
     class Document {
     }
-
+    class DocumentWithSubChapters {
+    }
+    class SuperChapter {
+    }
     class Chapter {
+      TopLevelChapterOfParagraphs
+      SubChapterOfParagraphs
     }
     class Paragraph {
-
     }
-
+    class BlockQuoteParagraph {
+    }
+    class Table {
+    }
+    class Heading {
+    }
     class Sentence {
     }
   }
 
   Document *-- Chapter
+  DocumentWithSubChapters *-- SuperChapter
+  SuperChapter *-- Chapter
   Chapter *-- Paragraph
-  Chapter <-- Paragraph
+  Chapter *-- Table
+  Chapter *-- Heading
+  Paragraph <|-- BlockQuoteParagraph
   Paragraph *-- Sentence
-  Paragraph <-- Sentence
 
   namespace pypdf {
     class Reader {
@@ -104,24 +121,26 @@ classDiagram
   Reader *-- Page
 
   namespace Conversion {
-    class Converter{
+    class ConverterBase{
     }
     class ExtractedPage {
     }
     class PageLayout {
-    int page # Starts on that page
-  }
+      reader_page_number  # printed on the page: int or str
+      page_number  # index of the page, from 0
+    }
   }
   Chapter o-- PageLayout
   Paragraph o-- PageLayout
   Sentence o-- PageLayout
+  Table o-- PageLayout
+  Heading o-- PageLayout
 
-  Converter *-- ExtractedPage
+  ConverterBase *-- ExtractedPage
   Chapter o-- ExtractedPage
   ExtractedPage --> Page
 
 ```
-
 
 ### Diagnostics
 

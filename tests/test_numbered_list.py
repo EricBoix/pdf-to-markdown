@@ -8,6 +8,7 @@ one while a list is open is a nested list.
 """
 
 from pdf_to_markdown import (
+    DebugComments,
     NumberedListAnnotator,
     NumberedListPlacement,
     NumberedListRole,
@@ -175,7 +176,11 @@ class TestHeuristicsSwitch:
 
 
 class TestFailureNote:
-    def test_original_number_kept_and_note_appended(self):
+    def test_original_number_kept_without_note_by_default(self):
+        assert NumberedListAnnotator.annotate_failure("4. Review") == "4. Review"
+
+    def test_original_number_kept_and_note_appended(self, monkeypatch):
+        monkeypatch.setenv(DebugComments.ENV_VAR, "1")
         assert NumberedListAnnotator.annotate_failure("4. Review") == (
             "4. Review <!-- Converter note: failing on ordered list -->"
         )

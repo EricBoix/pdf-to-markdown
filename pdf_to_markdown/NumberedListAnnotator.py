@@ -3,6 +3,8 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
+from .DebugComments import DebugComments
+
 
 class NumberedListRole(Enum):
     """The role of a paragraph with respect to the markdown numbered lists."""
@@ -206,11 +208,46 @@ class NumberedListAnnotator:
         return False
 
     @classmethod
+    def indentation_of_comment_before(
+        cls, text: str, placement: NumberedListPlacement
+    ) -> int:
+        """The indentation of an html comment (e.g. a PageMarker) that stands on
+        a line of its own before a paragraph, so that it does not break the
+        list that the paragraph belongs to.
+
+        A comment at the indentation of an item (e.g. none for an item of the
+        outermost list) would end the list above it, and the item would start
+        a new list. The comment thus belongs to the previous item, whose
+        content starts after its number: the width of the marker "N. " of the
+        previous item is added to the indentation.
+        """
+        if placement.role == NumberedListRole.ITEM:
+            item_number = cls._ITEM_REGEX.match(text)
+            if item_number and int(item_number.group(1)) > 1:
+                previous_number = int(item_number.group(1)) - 1
+                return placement.indentation + len(str(previous_number)) + 2
+        return placement.indentation
+
+    @classmethod
+    def indentation_inside(cls, text: str, placement: NumberedListPlacement) -> int:
+        """The indentation of the lines that follow an html comment standing
+        within the paragraph (e.g. a PageMarker on a line of its own): the
+        content of an item starts after its number, a line at the column of the
+        item would end the list.
+        """
+        if placement.role == NumberedListRole.ITEM:
+            item_number = cls._ITEM_REGEX.match(text)
+            if item_number:
+                return placement.indentation + len(item_number.group(1)) + 2
+        return placement.indentation
+
+    @classmethod
     def annotate_failure(cls, text: str) -> str:
         """Append the converter note to an item that fits in no list."""
         return text + cls.failure_suffix()
 
     @classmethod
     def failure_suffix(cls) -> str:
-        """What annotate_failure appends to the text."""
-        return f" {cls.FAILURE_NOTE}"
+        """What annotate_failure appends to the text: the converter note, when
+        the debug comments are on (see DebugComments)."""
+        return f" {cls.FAILURE_NOTE}" if DebugComments.enabled() else ""

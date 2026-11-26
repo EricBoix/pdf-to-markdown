@@ -109,6 +109,9 @@ class MarkdownToDocument:
                 title = self._extract_text(inlines, fn_state)
                 if level == 1:
                     document = Document(title)
+                    # The source is a markdown: it has no pages (the layouts
+                    # are dummies), hence no page markers.
+                    document.knows_pages = False
                 elif level == 2:
                     if current_chapter is not None:
                         current_chapter.renumber_sublevels()

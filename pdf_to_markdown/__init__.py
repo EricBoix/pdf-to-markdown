@@ -43,6 +43,8 @@ from .Splitter import (
     ParagraphAndBlockquoteSplitter,
 )
 from .Part import Part, PartKind
+from .DebugComments import DebugComments
+from .PageMarker import PageMarker, PageMarkerTracker
 from .TableDeclaration import TableDeclaration
 from .TableExtractor import TableExtractor
 from .TableLayoutParser import TableLayoutParser

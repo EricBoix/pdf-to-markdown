@@ -87,11 +87,12 @@ class Sentence(Numbered, Parent):
         # https://stackoverflow.com/questions/71590785/nlp-check-if-a-detected-sentence-is-a-complete-sentence
         # We check:
         # - starts with a capital letter
-        # - ends with punctuation
+        # - ends with punctuation (that a footnote number may follow, as in
+        #   "...in the mind-system.11")
         # - contains a verb (using NLTK POS tagging)
         if not self.text[0].isupper():
             return False
-        if not bool(re.search(r"[.!?]$", self.text)):
+        if not bool(re.search(r"[.!?]\d*$", self.text)):
             return False
         tokens = nltk.word_tokenize(self.text)
         tagged = nltk.pos_tag(tokens)

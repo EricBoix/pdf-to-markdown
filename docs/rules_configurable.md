@@ -69,7 +69,8 @@ The reading order of a page is the extractor's line order (top to bottom, one te
 flow). The converter relies on it wherever it reads the text of a page.
 
 - **Exceptions inside it:** floats such as pull quotes and the text of an
-  illustration, interleaved in line order inside a paragraph.
+  illustration, interleaved in line order inside a paragraph (The Mind
+  Illuminated pdf 198 to 199, Collecting Gold Dust pdf 129).
 - **Trap:** the order of the pages only, not the order inside a page.
 
 ## Which book declares which rule

@@ -21,6 +21,8 @@ from pdf_to_markdown import (
     StructuralInfoBase,
 )
 
+from .fixtures.fixture_structural_info import DeclaresTheMergeRules
+
 PARAGRAPH_BREAKING_PATTERN = "\n   "
 BLOCKQUOTE_PATTERN = r"(?:\A|\n\n)((?: {4}\S(?:(?! {5})[^\n])*(?:\n|\Z))+)(?=\n|\Z)"
 
@@ -190,7 +192,7 @@ class TestBlockquoteDeduplicator:
 
 
 class TestParagraphMergerIgnoresBlockquotes:
-    class _StructuralInfo(StructuralInfoBase):
+    class _StructuralInfo(DeclaresTheMergeRules, StructuralInfoBase):
         pages_info = {}
         total_page_number = 2
         numbered_list_heuristics_enabled = True
@@ -222,9 +224,7 @@ class TestParagraphMergerIgnoresBlockquotes:
         blockquote = _paragraph(BlockQuoteParagraph, 1, "A complete quote.")
         ending = _paragraph(Paragraph, 2, "clear and deep.")
         merged = self._merge(beginning, blockquote, ending)
-        # The quote of the first page moves before the merged paragraph (see
-        # test_blockquote_page_order.py)
-        assert merged == [blockquote, beginning]
+        assert merged == [beginning, blockquote]
         assert [sentence.text for sentence in beginning.get_sentences()] == [
             "It is calm.",
             "The mind is very clear and deep.",

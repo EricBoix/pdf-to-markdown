@@ -11,6 +11,8 @@ from pdf_to_markdown import (
     TopLevelChapterOfParagraphs,
 )
 
+from .fixtures.fixture_structural_info import DeclaresTheMergeRules
+
 
 def _paragraph(paragraph_class, page_number, *sentence_texts):
     paragraph = paragraph_class(PageLayout(page_number + 1, page_number))
@@ -22,7 +24,7 @@ def _paragraph(paragraph_class, page_number, *sentence_texts):
     return paragraph
 
 
-class _StructuralInfo(StructuralInfoBase):
+class _StructuralInfo(DeclaresTheMergeRules, StructuralInfoBase):
     total_page_number = 3
 
     def __init__(self, pages_info=None, new_chapter_pages=()):

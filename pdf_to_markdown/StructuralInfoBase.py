@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
+from .Errors import ConverterError
 from .PageInfo import PageInfo
 from .TableDeclaration import TableDeclaration
+from .typo_rules import TypoRuleRegister, TypoRuleStatus
 
 
 class StructuralInfoBase(ABC):
@@ -64,6 +66,14 @@ class StructuralInfoBase(ABC):
     # (and reads itself), that the package must not take for typos.
     EXTRA_PAGE_INFO_KEYS: frozenset[str] = frozenset()
 
+    # The rule configuration section of a document: the names of the
+    # typographic rules (see typo_rules.TypoRule) that hold for the document, and
+    # those that do not. A rule that is in neither set is unknown to the document
+    # (see rule_status). Derived classes override them, a class attribute is
+    # enough. An implicit rule (always true) is never declared.
+    valid_rules: frozenset[str] = frozenset()
+    rejected_rules: frozenset[str] = frozenset()
+
     @property
     @abstractmethod
     def pages_info(self) -> dict:
@@ -123,6 +133,39 @@ class StructuralInfoBase(ABC):
             }
         return self._page_infos.get(page_number, PageInfo())
 
+    def rule_status(self, rule_name: str) -> TypoRuleStatus:
+        """What the document declares about a typographic rule: HOLDS when the
+        name is in valid_rules (an implicit rule always holds), DOES_NOT_HOLD
+        when it is in rejected_rules, UNKNOWN otherwise.
+
+        A name that is not the one of a rule is an error: it is a typo.
+        """
+        if not self._rule_register.get(rule_name).configurable:
+            return TypoRuleStatus.HOLDS
+        if rule_name in self.valid_rules:
+            return TypoRuleStatus.HOLDS
+        if rule_name in self.rejected_rules:
+            return TypoRuleStatus.DOES_NOT_HOLD
+        return TypoRuleStatus.UNKNOWN
+
+    def rule_holds(self, rule_name: str) -> bool:
+        return self.rule_status(rule_name) is TypoRuleStatus.HOLDS
+
+    def _check_rule_declarations(self) -> None:
+        """Refuse a declaration naming no rule, an implicit rule, or a rule that
+        is both valid and rejected."""
+        for rule_name in self.valid_rules | self.rejected_rules:
+            if not self._rule_register.get(rule_name).configurable:
+                raise ConverterError(
+                    f"The rule {rule_name} is implicit (always true): "
+                    "a document does not declare it."
+                )
+        both = self.valid_rules & self.rejected_rules
+        if both:
+            raise ConverterError(
+                f"The rules {sorted(both)} are declared both valid and rejected."
+            )
+
     def get_table_row_continues(self, page_number) -> bool | None:
         """The declared decision about the row of a table cut by a page break.
 
@@ -155,6 +198,8 @@ class StructuralInfoBase(ABC):
         self._chapter_splitter_instance = None
         # See page_info()
         self._page_infos = None
+        self._rule_register = TypoRuleRegister.default()
+        self._check_rule_declarations()
 
     def get_chapter_splitter(self):
         """Get or create the chapter splitter for this document.

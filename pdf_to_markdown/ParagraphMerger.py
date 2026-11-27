@@ -8,6 +8,8 @@ from .Model import (
 from .DiagnosticsReporter import DiagnosticsReporter
 from .NumberedListAnnotator import NumberedListAnnotator
 from .Errors import ConverterError
+from .Model import Sentence
+from .typo_rules import TypoRuleRegister, TypoRuleVerdict
 
 
 class ParagraphMerger:
@@ -33,6 +35,39 @@ class ParagraphMerger:
     ) -> None:
         self.structural_info = structural_info
         self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
+        self._merge_rules = TypoRuleRegister.default().merge_rules()
+
+    def _continues(self, head: Sentence, tail: Sentence) -> bool:
+        """Whether the tail (the first sentence of a page) continues the head (the
+        last sentence of the page before), according to the typographic rules the
+        structural info declares to hold.
+
+        The rules are asked in order, the first verdict that is not NO_OPINION
+        decides. When no declared rule decides the answer is no: a false split
+        leaves a paragraph in two pieces, a false merge glues a sentence onto
+        another page (a design preference, not a rule). The declared rules are also
+        asked whether the page break contradicts them (a warning, see
+        TypoRuleForMerge.contradicted_by).
+        """
+        holding_rules = [
+            rule
+            for rule in self._merge_rules
+            if self.structural_info.rule_holds(rule.name)
+        ]
+        for rule in holding_rules:
+            if rule.contradicted_by(head, tail):
+                self._diagnostics.warn(
+                    f"The rule {rule.name} is declared to hold but the page break "
+                    f"between page {head.page_layout.page_number} "
+                    f"(ends with: {head.text[-60:]!r}) and page "
+                    f"{tail.page_layout.page_number} "
+                    f"(starts with: {tail.text[:60]!r}) contradicts it."
+                )
+        for rule in holding_rules:
+            verdict = rule.verdict(head, tail)
+            if verdict is not TypoRuleVerdict.NO_OPINION:
+                return verdict is TypoRuleVerdict.CONTINUES
+        return False
 
     def _page_requires_paragraph_continuation(self, page_number: int) -> bool:
         # A page that declares nothing requires the continuation (looks a bit
@@ -140,12 +175,15 @@ class ParagraphMerger:
                 top_level_chapter, ill_ending_paragraph, ill_starting_paragraph
             ):
                 continue
-            # A complete last sentence means there is nothing to continue: not
-            # merging is then correct, whatever the hierarchical parents are.
-            last_sentence_of_ill_ending_paragraph = (
-                ill_ending_paragraph.get_sentences()[-1]
-            )
-            if last_sentence_of_ill_ending_paragraph.is_complete():
+            # A tail that does not continue the head means there is nothing to
+            # continue: not merging is then correct, whatever the hierarchical
+            # parents are.
+            if not ill_starting_paragraph.get_sentences():
+                continue
+            if not self._continues(
+                ill_ending_paragraph.get_sentences()[-1],
+                ill_starting_paragraph.get_sentences()[0],
+            ):
                 continue
             # The item of a numbered list (e.g. an endnote) starting a page
             # is not the end of the paragraph above, even when the sentence
@@ -205,41 +243,6 @@ class ParagraphMerger:
             sibling_texts, ill_starting_paragraph.get_markdown_text()
         )
 
-    @staticmethod
-    def _move_blockquotes_between_before(
-        ill_ending_paragraph: Paragraph, ill_starting_paragraph: Paragraph
-    ) -> None:
-        """Keep the pages of the document in order around a merged paragraph.
-
-        A pull quote of the page that ends the paragraph often stands between
-        the two halves (e.g. at the bottom of the page). Once the halves are
-        merged into the paragraph that precedes the quote, the quote would
-        come after text of the next page. A blockquote lying between the two
-        halves, that lies entirely on the first page of the paragraph (or on
-        an earlier one), is thus moved right before the paragraph: its pages
-        then precede (or equal) every page of the paragraph. A blockquote that
-        reaches a later page (e.g. one cut by a page break as the paragraph
-        is) is left in place: no order of the two keeps the pages in order.
-        """
-        if isinstance(ill_ending_paragraph, BlockQuoteParagraph):
-            return
-        owner = ill_ending_paragraph._owning_hierarchical_level
-        sublevels = owner.get_sublevels()
-        between = sublevels[
-            sublevels.index(ill_ending_paragraph)
-            + 1 : sublevels.index(ill_starting_paragraph)
-        ]
-        first_page_number = ill_ending_paragraph.get_sentences()[
-            0
-        ].page_layout.page_number
-        for sublevel in between:
-            if isinstance(sublevel, BlockQuoteParagraph) and all(
-                sentence.page_layout.page_number <= first_page_number
-                for sentence in sublevel.get_sentences()
-            ):
-                owner.move_sublevel_before(sublevel, ill_ending_paragraph)
-        owner.renumber_sublevels()
-
     def _merge_across_page_break(
         self,
         ill_ending_paragraph: Paragraph,
@@ -286,10 +289,6 @@ class ParagraphMerger:
             )
             return
 
-        self._move_blockquotes_between_before(
-            ill_ending_paragraph, ill_starting_paragraph
-        )
-
         # Proceed with the merging
         first_sentence_of_ill_starting_paragraph = (
             ill_starting_paragraph.get_sentences()[0]
@@ -334,8 +333,12 @@ class ParagraphMerger:
                 or not starting_element.get_sentences()
             ):
                 continue
-            # A complete last sentence means two distinct blockquotes.
-            if ending_element.get_sentences()[-1].is_complete():
+            # A tail that does not continue the head means two distinct
+            # blockquotes.
+            if not self._continues(
+                ending_element.get_sentences()[-1],
+                starting_element.get_sentences()[0],
+            ):
                 continue
             self._merge_across_page_break(
                 ending_element, starting_element, page_number, next_page_number

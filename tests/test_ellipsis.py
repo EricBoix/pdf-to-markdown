@@ -3,7 +3,7 @@
 import nltk
 import pytest
 
-from pdf_to_markdown import PageLayout, Sentence, TextSanitizer
+from pdf_to_markdown import TextSanitizer
 
 
 class TestNormalizeSpacedEllipsis:
@@ -34,6 +34,3 @@ class TestEllipsisWithinSentences:
             "It ends.",
             "When the mind is unified, there is...",
         ]
-
-    def test_sentence_ending_with_an_ellipsis_is_complete(self):
-        assert Sentence("The mind is there...", PageLayout(1, 1)).is_complete()

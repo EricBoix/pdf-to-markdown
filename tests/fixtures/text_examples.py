@@ -125,7 +125,6 @@ SENTENCE_SPLIT_EXAMPLES = [
     # word-terminal apostrophe after a common word (right). The attribution
     # tail 'observed the teacher.' has two words, distinguishing it from a
     # single-word possessive tail like "cat." — neither fragment is framed.
-    # Source: Paul Reps, Zen Flesh Zen Bones (1957).
     (
         "'You are dead all right' observed the teacher. 'But how about that sound?'",
         [

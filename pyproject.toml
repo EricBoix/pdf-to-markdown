@@ -25,7 +25,7 @@ dependencies = [
 dev = ["pytest>=8.0", "pytest-cov", "fpdf2"]
 
 [tool.setuptools]
-packages = ["pdf_to_markdown"]
+packages = ["pdf_to_markdown", "pdf_to_markdown.typo_rules"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -76,6 +76,21 @@ converter.
   document read from a markdown (`MarkdownToDocument`) has no pages, hence no
   markers by default.
 
+### Typographic rules
+
+A typographic convention is local to a book (does a lowercase start on a new page
+continue the paragraph?). The converter acts on the rules a book declares in the
+rule configuration section of its structural information (`valid_rules`,
+`rejected_rules`); a rule that is in neither is unknown and never acts. The rules
+are described in `docs/`:
+
+- [rules_configurable.md](docs/rules_configurable.md): the rules the code relies
+  on, and how a book declares them;
+- [rules_implicit.md](docs/rules_implicit.md): the design choices that hold for
+  every book;
+- [rules_possible.md](docs/rules_possible.md): the candidate rules, with the
+  evidence found for and against.
+
 ## Model class diagram
 
 ```mermaid

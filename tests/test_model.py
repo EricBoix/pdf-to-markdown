@@ -52,31 +52,6 @@ class TestSentence:
         sentence.append(other)
         assert sentence.text == "First part second part."
 
-    def test_is_complete_true_for_grammatical_sentence(self):
-        sentence = Sentence("The monk walked slowly.", self._layout())
-        assert sentence.is_complete() is True
-
-    def test_is_complete_false_no_capital(self):
-        sentence = Sentence("no capital letter.", self._layout())
-        assert sentence.is_complete() is False
-
-    def test_is_complete_false_no_punctuation(self):
-        sentence = Sentence("Missing punctuation", self._layout())
-        assert sentence.is_complete() is False
-
-    def test_is_complete_true_when_a_footnote_number_follows_the_punctuation(self):
-        sentence = Sentence("The monk walked slowly.11", self._layout())
-        assert sentence.is_complete() is True
-
-    def test_is_complete_false_when_a_number_ends_a_sentence_without_punctuation(self):
-        sentence = Sentence("The monk walked for 11", self._layout())
-        assert sentence.is_complete() is False
-
-    def test_is_complete_false_no_verb(self):
-        # A noun phrase with capital letter and punctuation but no verb.
-        sentence = Sentence("The blue sky.", self._layout())
-        assert sentence.is_complete() is False
-
 
 class TestDocumentHierarchicalLevel:
     def _chapter_with_doc(self):

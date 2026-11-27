@@ -1,13 +1,11 @@
 from abc import ABC
 from typing import Generic, TypeVar
-import re
 import nltk
 from mdutils.mdutils import MdUtils
 
 # Ensure NLTK data is available (downloads once if missing)
 for resource, path in [
     ("punkt_tab", "tokenizers/punkt_tab"),
-    ("averaged_perceptron_tagger_eng", "taggers/averaged_perceptron_tagger_eng"),
 ]:
     try:
         nltk.data.find(path)
@@ -82,23 +80,6 @@ class Sentence(Numbered, Parent):
         """
         self.text += " " + other.text
 
-    def is_complete(self) -> bool:
-        # The problem is hard, refer e.g. to
-        # https://stackoverflow.com/questions/71590785/nlp-check-if-a-detected-sentence-is-a-complete-sentence
-        # We check:
-        # - starts with a capital letter
-        # - ends with punctuation (that a footnote number may follow, as in
-        #   "...in the mind-system.11")
-        # - contains a verb (using NLTK POS tagging)
-        if not self.text[0].isupper():
-            return False
-        if not bool(re.search(r"[.!?]\d*$", self.text)):
-            return False
-        tokens = nltk.word_tokenize(self.text)
-        tagged = nltk.pos_tag(tokens)
-        has_verb = any(tag.startswith("VB") for _, tag in tagged)
-        return has_verb
-
     def get_document_reference_long(self) -> str:
         # Paragraphs are nameless so we must grab the grand-parent
         owner_name = (
@@ -160,11 +141,6 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
             self.sublevels = list()
         self.sublevels.append(sublevel)
         sublevel.set_owning_hierarchical_level(self)
-
-    def move_sublevel_before(self, sublevel: T, reference_sublevel: T) -> None:
-        """Move a sublevel of this level right before another sublevel of it."""
-        self.sublevels.remove(sublevel)
-        self.sublevels.insert(self.sublevels.index(reference_sublevel), sublevel)
 
     def get_sublevel(self, index: int) -> T:
         if not self.sublevels or index >= len(self.sublevels):

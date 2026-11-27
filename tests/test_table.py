@@ -30,19 +30,21 @@ from pdf_to_markdown import (
     TopLevelChapterOfParagraphs,
 )
 
+from .fixtures.fixture_structural_info import DeclaresTheMergeRules
+
 FREE_FORM_PAGE = (
     "Here is how the two models align:\n"
     "\n"
-    "    CULADASA" + " " * 57 + "ASANGA\n"
-    " 1. Establishing a Practice\n"
-    " 2. Interrupted Attention"
+    "    OLDMODEL" + " " * 57 + "NEWMODEL\n"
+    " 1. Starting a Routine\n"
+    " 2. Fluctuating Attention"
     + " " * 34
-    + "1. Stoppage (sthaapaya)\n"
+    + "1. Pause (first kind)\n"
     + " " * 66
-    + "2. Continual Stoppage (samsthaapaya)\n"
-    " 3. Extended Attention" + " " * 37 + "3. Restorative Stoppage\n"
+    + "2. Repeated Pause (second kind)\n"
+    " 3. Lasting Attention" + " " * 38 + "3. Third Pause\n"
     "\n"
-    "Asanga's sthaapaya (1) is included in my Stage Two.\n"
+    "The new model's first step is included in my step two.\n"
 )
 
 
@@ -118,9 +120,9 @@ class StructuralInfoWithTables(StructuralInfoBase):
 def free_form_declaration():
     return TableDeclaration(
         "free form",
-        r"^(?= *CULADASA {5,}ASANGA)",
+        r"^(?= *OLDMODEL {5,}NEWMODEL)",
         column_count=2,
-        end_pattern=r"^Asanga's sthaapaya",
+        end_pattern=r"^The new model's first step",
     )
 
 
@@ -146,10 +148,10 @@ class TestTableLayoutParser:
         rows = TableLayoutParser().parse(
             FREE_FORM_PAGE.split("\n\n", 1)[1], free_form_declaration()
         )
-        assert rows[0] == ["CULADASA", "ASANGA"]
-        assert rows[1] == ["1. Establishing a Practice", ""]
-        assert rows[2] == ["2. Interrupted Attention", "1. Stoppage (sthaapaya)"]
-        assert rows[3] == ["", "2. Continual Stoppage (samsthaapaya)"]
+        assert rows[0] == ["OLDMODEL", "NEWMODEL"]
+        assert rows[1] == ["1. Starting a Routine", ""]
+        assert rows[2] == ["2. Fluctuating Attention", "1. Pause (first kind)"]
+        assert rows[3] == ["", "2. Repeated Pause (second kind)"]
 
     def test_rows_separated_by_blank_lines_have_their_wrapped_cells_joined(self):
         text = (
@@ -188,11 +190,11 @@ class TestTableExtractor:
             "\n"
             + TablePlaceholder.make("free form")
             + "\n"
-            + "Asanga's sthaapaya (1) is included in my Stage Two.\n"
+            + "The new model's first step is included in my step two.\n"
         )
         content = structural_info.table_registry.get("free form")
         assert content.caption is None
-        assert content.rows[0] == ["CULADASA", "ASANGA"]
+        assert content.rows[0] == ["OLDMODEL", "NEWMODEL"]
         assert len(content.rows) == 5
 
     def test_captioned_table_spreading_over_two_pages_is_one_table(self):
@@ -348,7 +350,7 @@ class TestTableMarkdown:
         ]
 
 
-class _MergerStructuralInfo(StructuralInfoBase):
+class _MergerStructuralInfo(DeclaresTheMergeRules, StructuralInfoBase):
     """What ParagraphMerger asks of a structural info, for a two pages chapter."""
 
     pages_info = {}
@@ -385,7 +387,7 @@ class TestTableInterruptsTheTextFlow:
 
     def test_paragraph_cut_by_a_page_break_is_merged_without_table(self):
         ending = self._paragraph(1, "Here is how the two models align:")
-        starting = self._paragraph(2, "Asanga's stages are included in mine.")
+        starting = self._paragraph(2, "The new model's steps are included in mine.")
         chapter = self._chapter_with(ending, starting)
         ParagraphMerger(
             _MergerStructuralInfo()
@@ -395,7 +397,7 @@ class TestTableInterruptsTheTextFlow:
     def test_paragraph_is_not_glued_to_the_one_following_a_table(self):
         ending = self._paragraph(1, "Here is how the two models align:")
         table = Table(PageLayout(1, 1), "t", None, True, [["A", "B"]])
-        starting = self._paragraph(2, "Asanga's stages are included in mine.")
+        starting = self._paragraph(2, "The new model's steps are included in mine.")
         chapter = self._chapter_with(ending, table, starting)
         ParagraphMerger(
             _MergerStructuralInfo()

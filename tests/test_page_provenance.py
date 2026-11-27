@@ -17,6 +17,8 @@ from pdf_to_markdown import (
     TopLevelChapterOfParagraphs,
 )
 
+from .fixtures.fixture_structural_info import DeclaresTheMergeRules
+
 
 def _paragraph(reader_page_number, page_number, *sentence_texts):
     paragraph = Paragraph(PageLayout(reader_page_number, page_number))
@@ -28,7 +30,7 @@ def _paragraph(reader_page_number, page_number, *sentence_texts):
     return paragraph
 
 
-class _StructuralInfo(StructuralInfoBase):
+class _StructuralInfo(DeclaresTheMergeRules, StructuralInfoBase):
     total_page_number = 3
     numbered_list_heuristics_enabled = False
 

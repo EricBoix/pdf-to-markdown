@@ -10,6 +10,27 @@ from pdf_to_markdown import (
     SuperChapter,
     TopLevelChapterOfParagraphs,
 )
+from pdf_to_markdown.typo_rules import (
+    CompleteHeadUppercaseTailStartsParagraph,
+    LowercaseTailContinues,
+    ReadingOrderIsLineOrder,
+    UnpunctuatedHeadContinues,
+)
+
+
+class DeclaresTheMergeRules:
+    """What a StructuralInfoBase declares for the paragraphs cut by a page break
+    to be merged (without any rule, nothing merges: see
+    ParagraphMerger._continues). Put it before StructuralInfoBase in the bases."""
+
+    valid_rules = frozenset(
+        {
+            LowercaseTailContinues.name,
+            UnpunctuatedHeadContinues.name,
+            CompleteHeadUppercaseTailStartsParagraph.name,
+            ReadingOrderIsLineOrder.name,
+        }
+    )
 
 
 class FixtureStructuralInfo(StructuralInfoBase):

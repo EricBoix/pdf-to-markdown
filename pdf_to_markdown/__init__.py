@@ -33,6 +33,13 @@ from .ExtractedPage import ExtractedPage
 from .PageInfo import PageInfo, TypoFix
 from .TypoFixer import TypoFixer
 from .SentenceBreaker import SentenceBreaker
+from .typo_rules import (
+    TypoRule,
+    TypoRuleForMerge,
+    TypoRuleRegister,
+    TypoRuleStatus,
+    TypoRuleVerdict,
+)
 from .StructuralInfoBase import StructuralInfoBase
 from .Splitter import (
     ChapterSplitter,

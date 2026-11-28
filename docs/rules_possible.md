@@ -96,33 +96,13 @@ project; it is carried out one rule at a time, each in its own change.
 Already carried out, they moved to [rules_configurable.md](rules_configurable.md):
 `SpacedEllipsisIsAnEllipsis`, `LayoutTextCarriesIndentationAndColumns`,
 `BlockquoteRepeatingParagraphIsDropped`,
-`NumberedItemStartingAPageIsNotAContinuation` and
-`TableRowCutHasEmptyCellAndLowercaseStart`. The proposals to keep as a fact
-(`TabsAreSpaces`, `TypographicQuotesAndDashesFoldToAscii`) moved to
+`NumberedItemStartingAPageIsNotAContinuation`,
+`TableRowCutHasEmptyCellAndLowercaseStart`, `DiacriticsFoldToBaseLetters` and
+`SmileyGlyphsFoldToAnEmoticon`. The proposals to keep as a fact (`TabsAreSpaces`,
+`TypographicQuotesAndDashesFoldToAscii`) moved to
 [rules_implicit.md](rules_implicit.md).
 
 ### Hardwired: the characters
-
-#### DiacriticsFoldToBaseLetters
-
-A fixed list of letters carrying a diacritic (seventeen, from the
-transliteration of one language) fold to their base letter.
-
-- **Where:** `TextSanitizer._normalize_diacritics`.
-- **Status:** hardwired, although the list belongs to the content of some books,
-  not to the package.
-- **Proposal:** configurable, declared by the book as the list it needs; a
-  character outside every list is then reported instead of passing silently.
-
-#### SmileyGlyphsFoldToAnEmoticon
-
-The white smiling face and the private-use glyph U+F04A of some fonts both stand
-for a smiley, folded to ":-)".
-
-- **Where:** `TextSanitizer._normalize_symbols`.
-- **Status:** hardwired. U+F04A is a font artefact: its meaning depends on the
-  font of the book.
-- **Proposal:** configurable, declared by the book.
 
 ### Hardwired: the text of a paragraph
 

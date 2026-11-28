@@ -34,6 +34,10 @@ class TextExtractor:
         self._layout_rule = structural_info.rule_if_holds(
             "LayoutTextCarriesIndentationAndColumns"
         )
+        self._folding_rules = structural_info.character_folding_rules()
+        self._diacritics_rule = structural_info.rule_if_holds(
+            "DiacriticsFoldToBaseLetters"
+        )
         # For each page, the number of whitespaces that were removed from the
         # indentation of its first line (see ExtractedPage).
         self.removed_first_line_indentations: dict[int, int] = {}
@@ -73,7 +77,16 @@ class TextExtractor:
             # spell the ellipses the one way that keeps them within their
             # sentence (". . ." would be cut into one sentence per dot by the
             # sentence tokenizer), see the class documentation.
-            text = TextSanitizer.sanitize_characters(text)
+            text = TextSanitizer.sanitize_characters(text, self._folding_rules)
+            # Rule DiacriticsFoldToBaseLetters (its trap), see
+            # docs/rules_configurable.md
+            if self._diacritics_rule is not None:
+                unfolded_characters = self._diacritics_rule.unfolded_characters(text)
+                if unfolded_characters:
+                    self._diagnostics.warn(
+                        f"The rule {self._diacritics_rule.name} does not fold the "
+                        f"characters {unfolded_characters} of page {page_number}."
+                    )
             # Rule SpacedEllipsisIsAnEllipsis, see docs/rules_configurable.md
             if self._spaced_ellipsis_rule is not None:
                 substitution_count = self._spaced_ellipsis_rule.substitution_count(text)

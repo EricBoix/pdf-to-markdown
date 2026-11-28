@@ -12,6 +12,12 @@ prevent accidental cross-stage mixing.
 import pytest
 
 from pdf_to_markdown import TextSanitizer
+from pdf_to_markdown.typo_rules import (
+    DiacriticsFoldToBaseLetters,
+    SmileyGlyphsFoldToAnEmoticon,
+)
+
+FOLDING_RULES = [DiacriticsFoldToBaseLetters(), SmileyGlyphsFoldToAnEmoticon()]
 
 from .fixtures.text_examples import (
     SENTENCE_ATTRIBUTION_BOUNDARY_EXAMPLES,
@@ -26,13 +32,13 @@ class TestCharacterSanitization:
 
     @pytest.mark.parametrize("input_text,expected", SENTENCE_CHARACTER_EXAMPLES)
     def test_sanitize_characters(self, input_text, expected):
-        assert TextSanitizer.sanitize_characters(input_text) == expected
+        assert TextSanitizer.sanitize_characters(input_text, FOLDING_RULES) == expected
 
     def test_sanitize_characters_is_idempotent(self):
         # Applying sanitization twice produces the same result as once.
         source = "don’t end… a—b"
-        once = TextSanitizer.sanitize_characters(source)
-        twice = TextSanitizer.sanitize_characters(once)
+        once = TextSanitizer.sanitize_characters(source, FOLDING_RULES)
+        twice = TextSanitizer.sanitize_characters(once, FOLDING_RULES)
         assert once == twice
 
 

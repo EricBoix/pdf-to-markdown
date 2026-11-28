@@ -133,6 +133,33 @@ that first row starts with a lowercase letter. The declaration of a page
 - **Trap:** the decision and its reason are reported for each page break of a
   table (warning).
 
+## DiacriticsFoldToBaseLetters
+
+The letters carrying a diacritic that a book uses (the transliteration of a
+language, for instance) fold to the closest ASCII base letter.
+
+- **Code:** `typo_rules/DiacriticsFoldToBaseLetters.py`; action site
+  `TextExtractor.extract_all` (and the declared names of the chapters,
+  `DocumentBreaker`), through `TextSanitizer.sanitize_characters`. The letters
+  are those of `StructuralInfoBase.diacritic_foldings` (a book overrides it; the
+  default is `DiacriticsFoldToBaseLetters.DEFAULT_FOLDINGS`). Without the rule
+  nothing is folded.
+- **Trap:** a character that is still not ASCII once folded is reported with its
+  page. The output is thus not always plain ASCII: the books converted so far
+  keep a few characters (letters of another alphabet, an en space, an arrow)
+  that no folding covers.
+
+## SmileyGlyphsFoldToAnEmoticon
+
+The white smiling face and the private-use glyph U+F04A that some PDF fonts use
+for a smiley both fold to ":-)". The meaning of U+F04A depends on the font of the
+book, hence the declaration.
+
+- **Code:** `typo_rules/SmileyGlyphsFoldToAnEmoticon.py`; action site
+  `TextExtractor.extract_all`, through `TextSanitizer.sanitize_characters`.
+- **Trap:** none: a glyph that the rule does not know is reported by the trap of
+  `DiacriticsFoldToBaseLetters` when the document holds it.
+
 ## Which book declares which rule
 
 Each book declares its rules in the structural information it derives from

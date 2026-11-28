@@ -38,85 +38,6 @@ class TextSanitizer:
         return text
 
     @staticmethod
-    def _normalize_diacritics(text: str) -> str:
-        """ASCII fold Pali diacritic characters to their base ASCII equivalents.
-
-        Pali transliteration uses several extended Latin characters that have no
-        ASCII counterpart. Each is folded to the closest ASCII base letter.
-        """
-        # fmt: off
-        text = text.replace(
-            "\u00f1",  # U+00F1 LATIN SMALL LETTER N WITH TILDE
-            "n",       # U+006E ASCII LATIN SMALL LETTER N
-        )
-        text = text.replace(
-            "\u0101",  # U+0101 LATIN SMALL LETTER A WITH MACRON
-            "a",       # U+0061 ASCII LATIN SMALL LETTER A
-        )
-        text = text.replace(
-            "\u012b",  # U+012B LATIN SMALL LETTER I WITH MACRON
-            "i",       # U+0069 ASCII LATIN SMALL LETTER I
-        )
-        text = text.replace(
-            "\u1e37",  # U+1E37 LATIN SMALL LETTER L WITH DOT BELOW
-            "l",       # U+006C ASCII LATIN SMALL LETTER L
-        )
-        text = text.replace(
-            "\u1e43",  # U+1E43 LATIN SMALL LETTER M WITH DOT BELOW
-            "m",       # U+006D ASCII LATIN SMALL LETTER M
-        )
-        text = text.replace(
-            "\u1e47",  # U+1E47 LATIN SMALL LETTER N WITH DOT BELOW
-            "n",       # U+006E ASCII LATIN SMALL LETTER N
-        )
-        text = text.replace(
-            "\u1e6d",  # U+1E6D LATIN SMALL LETTER T WITH DOT BELOW
-            "t",       # U+0074 ASCII LATIN SMALL LETTER T
-        )
-        text = text.replace(
-            "Ā",  # U+0100 LATIN CAPITAL LETTER A WITH MACRON
-            "A",       # U+0041 ASCII LATIN CAPITAL LETTER A
-        )
-        text = text.replace(
-            "Ī",  # U+012A LATIN CAPITAL LETTER I WITH MACRON
-            "I",       # U+0049 ASCII LATIN CAPITAL LETTER I
-        )
-        text = text.replace(
-            "Ś",  # U+015A LATIN CAPITAL LETTER S WITH ACUTE
-            "S",       # U+0053 ASCII LATIN CAPITAL LETTER S
-        )
-        text = text.replace(
-            "ś",  # U+015B LATIN SMALL LETTER S WITH ACUTE
-            "s",       # U+0073 ASCII LATIN SMALL LETTER S
-        )
-        text = text.replace(
-            "ū",  # U+016B LATIN SMALL LETTER U WITH MACRON
-            "u",       # U+0075 ASCII LATIN SMALL LETTER U
-        )
-        text = text.replace(
-            "ṅ",  # U+1E45 LATIN SMALL LETTER N WITH DOT ABOVE
-            "n",       # U+006E ASCII LATIN SMALL LETTER N
-        )
-        text = text.replace(
-            "ṣ",  # U+1E63 LATIN SMALL LETTER S WITH DOT BELOW
-            "s",       # U+0073 ASCII LATIN SMALL LETTER S
-        )
-        text = text.replace(
-            "ḍ",  # U+1E0D LATIN SMALL LETTER D WITH DOT BELOW
-            "d",       # U+0064 ASCII LATIN SMALL LETTER D
-        )
-        text = text.replace(
-            "ṛ",  # U+1E5B LATIN SMALL LETTER R WITH DOT BELOW
-            "r",       # U+0072 ASCII LATIN SMALL LETTER R
-        )
-        text = text.replace(
-            "ḥ",  # U+1E25 LATIN SMALL LETTER H WITH DOT BELOW
-            "h",       # U+0068 ASCII LATIN SMALL LETTER H
-        )
-        # fmt: on
-        return text
-
-    @staticmethod
     def _normalize_dashes(text: str) -> str:
         """ASCII fold typographic dash and ellipsis characters.
 
@@ -157,26 +78,7 @@ class TextSanitizer:
         return re.sub(r"\s+", " ", input_text).strip()
 
     @staticmethod
-    def _normalize_symbols(text: str) -> str:
-        """ASCII fold miscellaneous symbol characters.
-
-        U+263A WHITE SMILING FACE and U+F04A (private-use smiling face glyph
-        found in some PDF fonts) are both folded to the ASCII emoticon :-).
-        """
-        # fmt: off
-        text = text.replace(
-            "\u263a",  # U+263A WHITE SMILING FACE
-            ":-)",      # ASCII emoticon
-        )
-        text = text.replace(
-            "\uf04a",  # U+F04A private-use smiling face (PDF font glyph)
-            ":-)",      # ASCII emoticon
-        )
-        # fmt: on
-        return text
-
-    @staticmethod
-    def normalize_chapter_name(raw_name: str) -> str:
+    def normalize_chapter_name(raw_name: str, folding_rules=()) -> str:
         """Collapse newlines and ASCII-fold a raw chapter or sub-chapter name.
 
         A newline flanked on both sides by an uppercase letter is a within-word
@@ -190,15 +92,18 @@ class TextSanitizer:
         # "INTERLUDE\nConscious") would wrongly be glued to the previous word.
         name = re.sub(r"([A-Z])\n([A-Z])(?=[A-Z])", r"\1\2", raw_name)
         name = name.replace("\n", " ")
-        return TextSanitizer.sanitize_characters(name)
+        return TextSanitizer.sanitize_characters(name, folding_rules)
 
     @staticmethod
-    def sanitize_characters(input_text: str) -> str:
-        """ASCII-fold all known non-ASCII characters (quotes, diacritics, dashes, symbols)."""
+    def sanitize_characters(input_text: str, folding_rules=()) -> str:
+        """ASCII-fold the typographic quotes and dashes (a fact, see
+        docs/rules_implicit.md), then the characters of the given rules (see
+        TypoRuleForCharacters: diacritics, symbols...), that a document holds
+        or not."""
         input_text = TextSanitizer._normalize_typographic_quotes(input_text)
-        input_text = TextSanitizer._normalize_diacritics(input_text)
         input_text = TextSanitizer._normalize_dashes(input_text)
-        input_text = TextSanitizer._normalize_symbols(input_text)
+        for folding_rule in folding_rules:
+            input_text = folding_rule.fold(input_text)
         return input_text
 
     _MISMATCH_START = "<<PDF_TO_MARKDOWN DETECTED MISSMATCH: START>>"

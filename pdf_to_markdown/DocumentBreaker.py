@@ -135,7 +135,7 @@ class DocumentBreaker:
                     )
 
                 sanitized_new_chapter_name = TextSanitizer.normalize_chapter_name(
-                    new_chapter_name
+                    new_chapter_name, self.structural_info.character_folding_rules()
                 )
                 current_chapter = ChapterDerived(sanitized_new_chapter_name)
                 current_chapter_page_number = new_extracted_page.page_number

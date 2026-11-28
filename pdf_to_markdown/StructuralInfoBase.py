@@ -2,7 +2,12 @@ from abc import ABC, abstractmethod
 from .Errors import ConverterError
 from .PageInfo import PageInfo
 from .TableDeclaration import TableDeclaration
-from .typo_rules import TypoRule, TypoRuleRegister, TypoRuleStatus
+from .typo_rules import (
+    TypoRule,
+    TypoRuleForCharacters,
+    TypoRuleRegister,
+    TypoRuleStatus,
+)
 
 
 class StructuralInfoBase(ABC):
@@ -74,6 +79,12 @@ class StructuralInfoBase(ABC):
     valid_rules: frozenset[str] = frozenset()
     rejected_rules: frozenset[str] = frozenset()
 
+    # The letters carrying a diacritic that the rule DiacriticsFoldToBaseLetters
+    # folds, when the document holds it: None for the default ones (see
+    # DiacriticsFoldToBaseLetters.DEFAULT_FOLDINGS), a mapping for those a book
+    # declares.
+    diacritic_foldings: dict[str, str] | None = None
+
     @property
     @abstractmethod
     def pages_info(self) -> dict:
@@ -140,6 +151,15 @@ class StructuralInfoBase(ABC):
     def rule_holds(self, rule_name: str) -> bool:
         return self.rule_status(rule_name) is TypoRuleStatus.HOLDS
 
+    def character_folding_rules(self) -> list[TypoRuleForCharacters]:
+        """The rules folding characters (diacritics, symbols...) that the document
+        holds, to give to TextSanitizer.sanitize_characters."""
+        return [
+            rule
+            for rule in self.rule_register.character_rules()
+            if self.rule_holds(rule.name)
+        ]
+
     def rule_if_holds(self, rule_name: str) -> TypoRule | None:
         """The rule when the document holds it, None otherwise. This is how the
         code that acts on a rule gets it: the rules flow from the structural
@@ -198,7 +218,7 @@ class StructuralInfoBase(ABC):
         self._page_infos = None
         # The typographic rules, handed to the code that acts on them (the only
         # place where the register of the package is built)
-        self.rule_register = TypoRuleRegister.default()
+        self.rule_register = TypoRuleRegister.default(self.diacritic_foldings)
         self._check_rule_declarations()
 
     def get_chapter_splitter(self):

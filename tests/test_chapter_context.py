@@ -9,13 +9,19 @@ semantics.
 import pytest
 
 from pdf_to_markdown import TextSanitizer
+from pdf_to_markdown.typo_rules import (
+    DiacriticsFoldToBaseLetters,
+    SmileyGlyphsFoldToAnEmoticon,
+)
+
+FOLDING_RULES = [DiacriticsFoldToBaseLetters(), SmileyGlyphsFoldToAnEmoticon()]
 
 from .fixtures.text_examples import CHAPTER_NAME_EXAMPLES
 
 
 @pytest.mark.parametrize("raw_name,expected", CHAPTER_NAME_EXAMPLES)
 def test_normalize_chapter_name(raw_name, expected):
-    assert TextSanitizer.normalize_chapter_name(raw_name) == expected
+    assert TextSanitizer.normalize_chapter_name(raw_name, FOLDING_RULES) == expected
 
 
 def test_normalize_chapter_name_mid_word_uppercase_collapse():
@@ -44,4 +50,7 @@ def test_normalize_chapter_name_uppercase_word_then_capitalized_word():
 def test_normalize_chapter_name_mixed_split_and_diacritic():
     # Both rules apply in sequence: mid-word collapse then diacritic fold.
     # ā (U+0101, Pali macron-a) precedes the split; W and K are ASCII uppercase.
-    assert TextSanitizer.normalize_chapter_name("āWAK\nENING") == "aWAKENING"
+    assert (
+        TextSanitizer.normalize_chapter_name("āWAK\nENING", FOLDING_RULES)
+        == "aWAKENING"
+    )

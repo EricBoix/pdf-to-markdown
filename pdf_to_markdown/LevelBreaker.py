@@ -95,12 +95,20 @@ class LevelBreaker:
         # next content. Such a name is then carried over, and prepended to the
         # text of the next content, in order to be broken like any other name.
         pending_name_text = ""
+        # The page the carried over name is printed on (a name belongs to the
+        # page where it is printed, whereas the text it names starts on the next
+        # one, see HeadingIsOnItsPrintedPage).
+        pending_name_layout: PageLayout | None = None
         for level_content in contents:
             content_text = level_content.text or ""
+            name_layout = pending_name_layout
             if pending_name_text and content_text:
                 # The newline is the one that ended the name on its page.
                 content_text = pending_name_text + "\n" + content_text
+            else:
+                name_layout = None
             pending_name_text = ""
+            pending_name_layout = None
             self._diagnostics.debug(
                 f"####### break_into_sublevels, contents: {content_text}"
             )
@@ -119,12 +127,20 @@ class LevelBreaker:
 
                 if self._is_trailing_name_only(parts, level_content is contents[-1]):
                     pending_name_text = parts[0]
+                    pending_name_layout = name_layout or new_layout
                     break
 
                 new_sublevel, parts = self._try_create_sublevel(new_layout, parts)
                 if new_sublevel:
+                    if name_layout is not None:
+                        # The text of the sub-level was broken with the page it is
+                        # printed on (_try_create_sublevel), the sub-level itself
+                        # is on the page of its name.
+                        new_sublevel.page_layout = name_layout.__copy__()
+                    name_layout = None
                     current_level = new_sublevel
                     continue
+                name_layout = None
 
                 should_break, parts = self._handle_unbreakable_text(
                     new_layout, current_level, parts

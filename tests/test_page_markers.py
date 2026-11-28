@@ -400,6 +400,34 @@ class TestMarkersOfTheLevelsAndTheLeaves:
         )
 
 
+class TestLevelNamedOnThePageBeforeItsText:
+    def test_the_header_has_the_marker_of_its_page_and_the_text_that_of_its_own(self):
+        # A name that ends a page, the text it names starting on the next one
+        chapter = _chapter(
+            _paragraph(("First.", PAGE_IV)),
+            layout=PAGE_IV,
+        )
+        sub_chapter = TopLevelChapterOfParagraphs("Named at the end of a page")
+        sub_chapter.page_layout = PAGE_IV
+        sub_chapter.add_sublevel(_paragraph(("Its text.", PAGE_V)))
+        sub_chapter.renumber_sublevels()
+        chapter.add_sublevel(sub_chapter)
+        chapter.renumber_sublevels()
+        assert _lines(chapter) == [
+            "<!-- page reader=iv pdf=4 -->",
+            "",
+            "## Chapter",
+            "",
+            "First.",
+            "",
+            "### Named at the end of a page",
+            "",
+            "<!-- page reader=v pdf=5 -->",
+            "",
+            "Its text.",
+        ]
+
+
 class TestMarkersInWrappedLines:
     SENTENCES = [
         ("Alpha alpha alpha alpha.", PAGE_IV),

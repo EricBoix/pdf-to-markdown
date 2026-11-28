@@ -14,8 +14,12 @@ The rules that depend on the book are in
 A heading belongs to the page where the PDF prints it, never to the page of its
 body. A reader who cites a heading must land on its exact page.
 
-- **Met by the code:** not yet. When a heading ends a page, the level breaker
-  carries it over and rebuilds it with the layout of the next page.
+- **Met by the code:** yes. When the name of a level is the last line of a page,
+  the level breaker carries it over to the next page to break the text it names
+  (`LevelBreaker.break_into_sublevels`); the level is then given the page where
+  its name is printed, and its text keeps the page it is printed on. A
+  `Heading` (a sub-title that no level stands for) is created with the page of
+  the text it was cut from, which is the page where it is printed.
 
 ## TableRowIsOnItsPrintedPage
 

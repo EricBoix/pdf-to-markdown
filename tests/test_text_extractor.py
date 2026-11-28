@@ -7,10 +7,16 @@ verify the normalization rules (tab→space, lstrip) without needing a real PDF.
 from unittest.mock import MagicMock
 
 from pdf_to_markdown import TextExtractor
+from pdf_to_markdown.typo_rules import (
+    LayoutTextCarriesIndentationAndColumns,
+    SpacedEllipsisIsAnEllipsis,
+)
 
 
-def _make_mock(page_texts: list[str]):
-    """Build a mock reader and structural_info for the given page texts."""
+def _make_mock(page_texts: list[str], held_rules=()):
+    """Build a mock reader and structural_info for the given page texts. The
+    structural_info holds the given rules (instances) and no other."""
+    rules = {rule.name: rule for rule in held_rules}
     mock_pages = []
     for text in page_texts:
         page = MagicMock()
@@ -21,6 +27,7 @@ def _make_mock(page_texts: list[str]):
     mock_reader.pages = mock_pages
 
     mock_si = MagicMock()
+    mock_si.rule_if_holds.side_effect = rules.get
     mock_si.total_page_number = len(page_texts)
     mock_si._page_is_dropped.return_value = False
     mock_si.strip_page_text_leading_whitespace.side_effect = (
@@ -68,6 +75,7 @@ def test_extract_all_layout_mode_fallback():
     mock_reader.pages = [page]
 
     mock_si = MagicMock()
+    mock_si.rule_if_holds.return_value = None
     mock_si.total_page_number = 1
     mock_si._page_is_dropped.return_value = False
     mock_si.strip_page_text_leading_whitespace.side_effect = (
@@ -86,7 +94,10 @@ def test_extract_all_text_is_folded_to_ascii():
 
 
 def test_extract_all_spaced_ellipsis_is_spelled_plainly():
-    reader, si = _make_mock(["there is . . . and no space before. . . either"])
+    reader, si = _make_mock(
+        ["there is . . . and no space before. . . either"],
+        [SpacedEllipsisIsAnEllipsis()],
+    )
     result = TextExtractor(reader, si).extract_all()
     assert result == {0: "there is... and no space before... either"}
 
@@ -96,3 +107,32 @@ def test_extract_all_folds_before_the_leading_whitespace_is_stripped():
     reader, si = _make_mock(["   “quoted”"])
     TextExtractor(reader, si).extract_all()
     si.strip_page_text_leading_whitespace.assert_called_once_with('   "quoted"')
+
+
+def test_extract_all_spaced_ellipsis_is_left_alone_without_the_rule():
+    reader, si = _make_mock(["there is . . . more"])
+    result = TextExtractor(reader, si).extract_all()
+    assert result == {0: "there is . . . more"}
+
+
+def _fallback_reader_and_info(held_rules):
+    page = MagicMock()
+    page.extract_text.side_effect = [NotImplementedError(), "plain text"]
+    reader, si = _make_mock([""], held_rules)
+    reader.pages = [page]
+    return reader, si
+
+
+def test_layout_fallback_is_reported_when_the_document_holds_the_rule(caplog):
+    reader, si = _fallback_reader_and_info([LayoutTextCarriesIndentationAndColumns()])
+    with caplog.at_level("WARNING", logger="pdf_to_markdown"):
+        TextExtractor(reader, si).extract_all()
+    assert "LayoutTextCarriesIndentationAndColumns" in caplog.text
+    assert "page 0" in caplog.text
+
+
+def test_layout_fallback_is_not_reported_without_the_rule(caplog):
+    reader, si = _fallback_reader_and_info([])
+    with caplog.at_level("WARNING", logger="pdf_to_markdown"):
+        TextExtractor(reader, si).extract_all()
+    assert caplog.text == ""

@@ -87,17 +87,6 @@ class StructuralInfoBase(ABC):
         ...
 
     @property
-    def numbered_list_heuristics_enabled(self) -> bool:
-        """Whether the heuristics dealing with numbered lists are applied.
-
-        Those heuristics (see NumberedListAnnotator) indent the paragraphs
-        belonging to an item of a numbered list or to a nested list, and keep
-        an item that starts a page from being merged into the paragraph
-        above. Derived classes override this to disable them.
-        """
-        return True
-
-    @property
     def dropped_sections(self) -> list[str]:
         """Titles of the sections (at any depth) to drop from the document.
 

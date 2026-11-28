@@ -6,7 +6,6 @@ from .Model import (
     TopLevelChapter,
 )
 from .DiagnosticsReporter import DiagnosticsReporter
-from .NumberedListAnnotator import NumberedListAnnotator
 from .Errors import ConverterError
 from .Model import Sentence
 from .typo_rules import TypoRuleForMerge, TypoRuleVerdict
@@ -231,9 +230,15 @@ class ParagraphMerger:
         begins with the number following the last item above is an item, not
         the end of the paragraph cut by the page break. Failure mode: a
         paragraph really cut right before such a number is left unmerged.
-        Disable: StructuralInfoBase.numbered_list_heuristics_enabled.
+        Disable: a document that does not hold the rule
+        NumberedItemStartingAPageIsNotAContinuation.
         """
-        if not self.structural_info.numbered_list_heuristics_enabled:
+        # Rule NumberedItemStartingAPageIsNotAContinuation, see
+        # docs/rules_configurable.md
+        numbered_item_rule = self.structural_info.rule_if_holds(
+            "NumberedItemStartingAPageIsNotAContinuation"
+        )
+        if numbered_item_rule is None:
             return False
         owner = ill_ending_paragraph._owning_hierarchical_level
         sibling_texts = []
@@ -242,7 +247,7 @@ class ParagraphMerger:
                 sibling_texts.append(sibling.get_markdown_text())
             if sibling is ill_ending_paragraph:
                 break
-        return NumberedListAnnotator().heuristic_is_next_item(
+        return numbered_item_rule.starts_next_item(
             sibling_texts, ill_starting_paragraph.get_markdown_text()
         )
 

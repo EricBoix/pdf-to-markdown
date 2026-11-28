@@ -97,6 +97,8 @@ HINDRANCES_SECOND_PAGE = "\n".join(
 
 
 class StructuralInfoWithTables(StructuralInfoBase):
+    valid_rules = frozenset({"TableRowCutHasEmptyCellAndLowercaseStart"})
+
     def __init__(self, declarations, pages_info=None):
         StructuralInfoBase.__init__(self)
         self._declarations = declarations
@@ -196,6 +198,21 @@ class TestTableExtractor:
         assert content.caption is None
         assert content.rows[0] == ["OLDMODEL", "NEWMODEL"]
         assert len(content.rows) == 5
+
+    def test_a_cut_row_is_not_glued_when_the_document_does_not_hold_the_rule(self):
+        class _StructuralInfoWithoutRule(StructuralInfoWithTables):
+            valid_rules = frozenset()
+
+        structural_info = _StructuralInfoWithoutRule(
+            [hindrances_declaration()],
+            {2: {}},
+        )
+        extractor = TableExtractor(structural_info, structural_info.table_registry)
+        extractor.extract_tables(make_page(1, HINDRANCES_FIRST_PAGE))
+        extractor.extract_tables(make_page(2, HINDRANCES_SECOND_PAGE))
+        rows = structural_info.table_registry.get("TABLE 4").rows
+        # The two halves of the cut row stay two rows (four rows once glued)
+        assert len(rows) == 5
 
     def test_captioned_table_spreading_over_two_pages_is_one_table(self):
         structural_info = StructuralInfoWithTables(
@@ -355,7 +372,6 @@ class _MergerStructuralInfo(DeclaresTheMergeRules, StructuralInfoBase):
 
     pages_info = {}
     total_page_number = 2
-    numbered_list_heuristics_enabled = False
 
     def _get_page_number_finishing_last_paragraph(self, page_number):
         return page_number + 1

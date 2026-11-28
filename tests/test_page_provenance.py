@@ -32,7 +32,6 @@ def _paragraph(reader_page_number, page_number, *sentence_texts):
 
 class _StructuralInfo(DeclaresTheMergeRules, StructuralInfoBase):
     total_page_number = 3
-    numbered_list_heuristics_enabled = False
 
     def __init__(self, pages_info=None):
         super().__init__()

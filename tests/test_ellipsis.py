@@ -3,7 +3,7 @@
 import nltk
 import pytest
 
-from pdf_to_markdown import TextSanitizer
+from pdf_to_markdown.typo_rules import SpacedEllipsisIsAnEllipsis
 
 
 class TestNormalizeSpacedEllipsis:
@@ -18,16 +18,21 @@ class TestNormalizeSpacedEllipsis:
         ],
     )
     def test_normalize_spaced_ellipsis(self, input_text, expected):
-        assert TextSanitizer.normalize_spaced_ellipsis(input_text) == expected
+        assert SpacedEllipsisIsAnEllipsis().normalize(input_text) == expected
 
     def test_normalize_spaced_ellipsis_is_idempotent(self):
-        once = TextSanitizer.normalize_spaced_ellipsis("there is . . .")
-        assert TextSanitizer.normalize_spaced_ellipsis(once) == once
+        rule = SpacedEllipsisIsAnEllipsis()
+        once = rule.normalize("there is . . .")
+        assert rule.normalize(once) == once
+
+    def test_substitutions_are_counted(self):
+        rule = SpacedEllipsisIsAnEllipsis()
+        assert rule.substitution_count("a . . . b. . . c... d") == 2
 
 
 class TestEllipsisWithinSentences:
     def test_ellipsis_does_not_cut_the_sentence(self):
-        text = TextSanitizer.normalize_spaced_ellipsis(
+        text = SpacedEllipsisIsAnEllipsis().normalize(
             "It ends. When the mind is unified, there is . . ."
         )
         assert nltk.tokenize.sent_tokenize(text) == [

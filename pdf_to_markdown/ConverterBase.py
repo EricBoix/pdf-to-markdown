@@ -18,8 +18,11 @@ class ConverterBase(DocumentBuilder):
     ) -> None:
         self.pdf_filename = pdf_filename
         diagnostics = DiagnosticsReporter()
+        # Rule NumberedItemStartingAPageIsNotAContinuation, see
+        # docs/rules_configurable.md
         document.numbered_list_heuristics_enabled = (
-            structural_info.numbered_list_heuristics_enabled
+            structural_info.rule_if_holds("NumberedItemStartingAPageIsNotAContinuation")
+            is not None
         )
         # See LineWrapper (None: the lines of the paragraphs are never broken)
         document.maximum_line_length = maximum_line_length

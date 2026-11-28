@@ -105,7 +105,6 @@ def test_something_else_than_a_level_or_a_leaf_is_reported():
 class _StructuralInfo(StructuralInfoBase):
     total_page_number = 2
     pages_info = {}
-    numbered_list_heuristics_enabled = False
 
 
 def test_chapter_without_content_is_left_alone_by_the_merger(caplog):

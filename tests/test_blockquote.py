@@ -21,6 +21,11 @@ from pdf_to_markdown import (
     StructuralInfoBase,
 )
 
+from pdf_to_markdown.typo_rules import (
+    BlockquoteRepeatingParagraphIsDropped,
+    NumberedItemStartingAPageIsNotAContinuation,
+)
+
 from .fixtures.fixture_structural_info import DeclaresTheMergeRules
 
 PARAGRAPH_BREAKING_PATTERN = "\n   "
@@ -124,7 +129,9 @@ def _document_of(*paragraphs):
 class TestBlockquoteDeduplicator:
     def _deduplicate(self, *paragraphs):
         document, chapter = _document_of(*paragraphs)
-        BlockquoteDeduplicator().remove_duplicated_blockquotes(document)
+        BlockquoteDeduplicator(
+            BlockquoteRepeatingParagraphIsDropped()
+        ).remove_duplicated_blockquotes(document)
         return chapter.get_sublevels()
 
     def test_blockquote_repeating_the_beginning_of_a_paragraph_is_dropped(self):
@@ -138,6 +145,13 @@ class TestBlockquoteDeduplicator:
         paragraph = _paragraph(Paragraph, 1, "First one.", "Second one.", "Third one.")
         blockquote = _paragraph(BlockQuoteParagraph, 1, "Second one.")
         assert self._deduplicate(paragraph, blockquote) == [paragraph]
+
+    def test_nothing_is_dropped_when_the_document_does_not_hold_the_rule(self):
+        paragraph = _paragraph(Paragraph, 1, "Only sentence.")
+        blockquote = _paragraph(BlockQuoteParagraph, 1, "Only sentence.")
+        document, chapter = _document_of(paragraph, blockquote)
+        BlockquoteDeduplicator().remove_duplicated_blockquotes(document)
+        assert chapter.get_sublevels() == [paragraph, blockquote]
 
     def test_blockquote_repeating_a_whole_paragraph_is_dropped(self):
         paragraph = _paragraph(Paragraph, 1, "Only sentence.")
@@ -195,7 +209,9 @@ class TestParagraphMergerIgnoresBlockquotes:
     class _StructuralInfo(DeclaresTheMergeRules, StructuralInfoBase):
         pages_info = {}
         total_page_number = 2
-        numbered_list_heuristics_enabled = True
+        valid_rules = DeclaresTheMergeRules.valid_rules | {
+            NumberedItemStartingAPageIsNotAContinuation.name
+        }
 
         def _get_page_number_finishing_last_paragraph(self, page_number):
             return page_number + 1

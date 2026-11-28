@@ -1,3 +1,4 @@
+from .DiagnosticsReporter import DiagnosticsReporter
 from .TextSanitizer import TextSanitizer
 
 
@@ -7,7 +8,8 @@ class TextExtractor:
     This separates the text extraction concern from DocumentBreaker.
 
     The text that comes out is plain ASCII (see TextSanitizer.sanitize_characters
-    and TextSanitizer.normalize_spaced_ellipsis): this is the only place where
+    and, for a document holding the rule SpacedEllipsisIsAnEllipsis, its
+    ellipses spelled "..."): this is the only place where
     the text of the pages is folded. Whatever reads it downstream (the regexes
     of a StructuralInfo, the sanitizing of a book, the typos to fix...) is thus
     written against ASCII text, and nothing needs to fold the text again.
@@ -18,9 +20,20 @@ class TextExtractor:
     it folds to.
     """
 
-    def __init__(self, reader, structural_info) -> None:
+    def __init__(
+        self, reader, structural_info, diagnostics: DiagnosticsReporter | None = None
+    ) -> None:
         self.reader = reader
         self.structural_info = structural_info
+        self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
+        # The rules (None when the document does not hold them) come from the
+        # structural information
+        self._spaced_ellipsis_rule = structural_info.rule_if_holds(
+            "SpacedEllipsisIsAnEllipsis"
+        )
+        self._layout_rule = structural_info.rule_if_holds(
+            "LayoutTextCarriesIndentationAndColumns"
+        )
         # For each page, the number of whitespaces that were removed from the
         # indentation of its first line (see ExtractedPage).
         self.removed_first_line_indentations: dict[int, int] = {}
@@ -48,6 +61,12 @@ class TextExtractor:
                 # Fallback for PDFs with filter arrays that pypdf can't handle
                 # in layout mode
                 text = original_page.extract_text()
+                # Rule LayoutTextCarriesIndentationAndColumns (its trap), see
+                # docs/rules_configurable.md
+                if self._layout_rule is not None:
+                    self._diagnostics.warn(
+                        self._layout_rule.contradicted_by_fallback(page_number)
+                    )
             # Normalize tabs to spaces (some PDFs have tabs instead of spaces)
             text = text.replace("\t", " ")
             # Fold to ASCII (typographic quotes and dashes, diacritics...) and
@@ -55,7 +74,15 @@ class TextExtractor:
             # sentence (". . ." would be cut into one sentence per dot by the
             # sentence tokenizer), see the class documentation.
             text = TextSanitizer.sanitize_characters(text)
-            text = TextSanitizer.normalize_spaced_ellipsis(text)
+            # Rule SpacedEllipsisIsAnEllipsis, see docs/rules_configurable.md
+            if self._spaced_ellipsis_rule is not None:
+                substitution_count = self._spaced_ellipsis_rule.substitution_count(text)
+                if substitution_count:
+                    self._diagnostics.debug(
+                        f"{substitution_count} spaced ellipsis(es) on page "
+                        f"{page_number}"
+                    )
+                text = self._spaced_ellipsis_rule.normalize(text)
             # lstrip is required before holds_new_chapter classification
             # It is delegated to the structural info because a book might
             # have to keep the indentation of the first line of a page (e.g.

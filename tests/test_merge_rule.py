@@ -31,7 +31,6 @@ def _sentence(text, page_number=1):
 class _StructuralInfo(DeclaresTheMergeRules, StructuralInfoBase):
     pages_info = {}
     total_page_number = 3
-    numbered_list_heuristics_enabled = False
 
     def _holds_new_chapter(self, page_number):
         return False
@@ -40,7 +39,6 @@ class _StructuralInfo(DeclaresTheMergeRules, StructuralInfoBase):
 class _StructuralInfoDeclaringNoRule(StructuralInfoBase):
     pages_info = {}
     total_page_number = 3
-    numbered_list_heuristics_enabled = False
 
     def _holds_new_chapter(self, page_number):
         return False

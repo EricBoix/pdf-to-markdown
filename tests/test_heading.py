@@ -180,7 +180,6 @@ class TestHeadingIsALeaf:
 class _MergerStructuralInfo(StructuralInfoBase):
     pages_info = {}
     total_page_number = 2
-    numbered_list_heuristics_enabled = False
 
     def _get_page_number_finishing_last_paragraph(self, page_number):
         return page_number + 1

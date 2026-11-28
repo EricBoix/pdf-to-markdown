@@ -44,6 +44,11 @@ Each row of a table belongs to the page where the PDF prints it.
 These are not rules: the converter is built on them.
 
 - The output markdown carries no typography (no bold, no size, no superscript).
+- A tab in the text of a page stands for a space (`TextExtractor.extract_all`).
+- Curly quotes, the em dash (to "--"), the en dash (to "-") and the horizontal
+  ellipsis (to "...") are folded to ASCII (`TextSanitizer.sanitize_characters`).
+  The folding is many-to-one: the right single quotation mark is both a closing
+  quote and an apostrophe, and cannot be told apart afterwards.
 - A sentence belongs to the page where it starts.
 - The blockquotes are ignored when looking for the first or last paragraph of a
   page: they are floating boxes, not part of the running text.

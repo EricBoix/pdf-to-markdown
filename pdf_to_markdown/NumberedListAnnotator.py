@@ -52,7 +52,8 @@ class NumberedListAnnotator:
       to no list is left untouched and reported as a warning (it is a
       deliberate dead end: no attempt is made to repair it), which markdownlint
       rule MD029 then flags in the generated markdown.
-    - Disable: StructuralInfoBase.numbered_list_heuristics_enabled (False).
+    - Disable: a document that does not hold the rule
+      NumberedItemStartingAPageIsNotAContinuation.
     """
 
     # Paragraphs separating two consecutive items of a list. Beyond this

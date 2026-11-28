@@ -56,7 +56,8 @@ class DocumentBuilder(TextSanitizer, ABC):
             structural_info, diagnostics=self._diagnostics
         )
         self._blockquote_deduplicator = BlockquoteDeduplicator(
-            diagnostics=self._diagnostics
+            rule=structural_info.rule_if_holds("BlockquoteRepeatingParagraphIsDropped"),
+            diagnostics=self._diagnostics,
         )
         self._page_break_inserter = PageBreakInserter(
             reading_order_rule=structural_info.rule_if_holds("ReadingOrderIsLineOrder"),

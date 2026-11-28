@@ -78,6 +78,226 @@ without loss of content.
 - **Not followed:** by an illustration page whose text is original: the page is
   kept.
 
+## Found by reading the converter
+
+What follows was found by reading the modules of the package and the hooks a
+book supplies (not by measuring a book): every behaviour that rests on a belief
+about typography. Each entry is a candidate. Nothing changes in the code until
+each one is accepted, rejected or split. An accepted entry becomes a class with
+an action site and a trap, like the rules of
+[rules_configurable.md](rules_configurable.md).
+
+For each entry: the statement, where the code acts, its status (**hardwired**:
+the same for every book; **declared**: the book says it, as data or as a pattern
+of its own code, without going through `valid_rules`; **not used**), and what
+accepting it would mean. A "proposal" has been accepted by the owner of the
+project; it is carried out one rule at a time, each in its own change.
+
+Already carried out, they moved to [rules_configurable.md](rules_configurable.md):
+`SpacedEllipsisIsAnEllipsis`, `LayoutTextCarriesIndentationAndColumns`,
+`BlockquoteRepeatingParagraphIsDropped`,
+`NumberedItemStartingAPageIsNotAContinuation` and
+`TableRowCutHasEmptyCellAndLowercaseStart`. The proposals to keep as a fact
+(`TabsAreSpaces`, `TypographicQuotesAndDashesFoldToAscii`) moved to
+[rules_implicit.md](rules_implicit.md).
+
+### Hardwired: the characters
+
+#### DiacriticsFoldToBaseLetters
+
+A fixed list of letters carrying a diacritic (seventeen, from the
+transliteration of one language) fold to their base letter.
+
+- **Where:** `TextSanitizer._normalize_diacritics`.
+- **Status:** hardwired, although the list belongs to the content of some books,
+  not to the package.
+- **Proposal:** configurable, declared by the book as the list it needs; a
+  character outside every list is then reported instead of passing silently.
+
+#### SmileyGlyphsFoldToAnEmoticon
+
+The white smiling face and the private-use glyph U+F04A of some fonts both stand
+for a smiley, folded to ":-)".
+
+- **Where:** `TextSanitizer._normalize_symbols`.
+- **Status:** hardwired. U+F04A is a font artefact: its meaning depends on the
+  font of the book.
+- **Proposal:** configurable, declared by the book.
+
+### Hardwired: the text of a paragraph
+
+#### NewlineInTextIsLineFolding
+
+A newline inside the text of a paragraph or of a sentence is a line wrap, and
+becomes a space; runs of whitespace become one space.
+
+- **Where:** `TextSanitizer.normalize_newlines_and_multiple_whitespaces`.
+- **Status:** hardwired. The paragraph boundary is decided before, by the
+  pattern of the book (see `IndentedLineStartsParagraph`).
+- **Not the same everywhere:** a hyphen ending a line stays in the running text
+  with a space after it (the documentation of `BlockquoteDeduplicator` cites
+  "non- perceiving"), whereas the cells of a table glue the two pieces of a
+  hyphenated word (`TableLayoutParser.join_wrapped_text`, see the next entry).
+
+#### LineEndingHyphenJoinsTheWordInTableCells
+
+A table cell wrapped on many lines is one text, and a hyphen ending a piece
+glues it to the next piece without a space ("fame-" "obscurity").
+
+- **Where:** `TableLayoutParser.join_wrapped_text`.
+- **Status:** hardwired. Nothing tells a hyphen added by the typesetter from the
+  hyphen of a compound word, and both are glued.
+- **Proposal:** documentation only until a counter-example is seen.
+
+#### UppercaseNameSplitAcrossLinesIsOneWord
+
+A newline between two uppercase letters, the second followed by an uppercase
+letter, is a split inside a word of a title ("GET" "TING").
+
+- **Where:** `TextSanitizer.normalize_chapter_name`.
+- **Status:** hardwired. Applies to titles in capitals only.
+- **Proposal:** keep as a fact of the extractor; add a trap when the glued name
+  contains a word that no capital title would have.
+
+#### WordTerminalApostropheIsAmbiguous
+
+A letter followed by an apostrophe and a space, in a sentence that opens with an
+apostrophe, may be a possessive or a closing quote: the sentence is framed with
+mismatch markers instead of being guessed.
+
+- **Where:** `TextSanitizer.frame_sentences_if_unbalanced`, called by
+  `SentenceBreaker`.
+- **Status:** hardwired (the decision is *not to decide*, and to say so).
+- **Proposal:** keep: it is a trap, already.
+
+#### SentencesEndWhereTheEnglishTokenizerSaysSo
+
+The boundaries between the sentences of a paragraph are those of the NLTK
+sentence tokenizer (English).
+
+- **Where:** `SentenceBreaker.break_into_sentences`.
+- **Status:** hardwired. A book in another language is cut by English rules.
+- **Proposal:** configurable (the language of the book). The page break rules
+  (`TERMINAL_PUNCTUATION`) are English as well.
+
+### Hardwired: the extraction
+
+#### PageTextLeadingWhitespaceIsMargin
+
+The whitespace before the first line of a page is the margin of the page, not
+text, and is stripped.
+
+- **Where:** `StructuralInfoBase.strip_page_text_leading_whitespace` (default
+  `lstrip`), whose result `TextExtractor` compares with the original to record
+  `removed_first_line_indentations`.
+- **Status:** hardwired by default, overridable by a book that needs the indent
+  of the first line (a pull quote or a centered title at the very top of a
+  page).
+- **Proposal:** the override is the book saying "the indent of the first line of
+  a page carries information": the same belief as
+  `IndentedTailStartsParagraph`. Decide them together.
+
+### Hardwired: the page breaks and the tree
+
+#### ParagraphMayContinueOnTheNextPageUnlessDeclared
+
+A page that declares nothing may end with a paragraph (or a blockquote) that the
+next page continues. A page flagged `paragraph_fits_on_page` or
+`blockquote_fits_on_page` is the declared exception.
+
+- **Where:** `ParagraphMerger._page_requires_paragraph_continuation`,
+  `_page_requires_blockquote_continuation`. The code comment itself calls it
+  "a bit ambitious".
+- **Status:** hardwired default, declared per page. The merge rules then decide
+  whether the paragraph really continues.
+- **Proposal:** keep (the merge rules are the filter); the per-page flags are
+  data, listed below.
+
+#### TableOrHeadingBetweenInterruptsTheTextFlow
+
+When a table or a heading comes between the last paragraph of a page and the
+first of the next one, the two paragraphs are not merged.
+
+- **Where:** `ParagraphMerger._table_lies_between`.
+- **Status:** hardwired.
+- **Proposal:** keep as a fact (a sentence announcing a table is not continued
+  by the paragraph that comments it): the rule is the reason, the code is the
+  action site.
+
+#### TableColumnsAreSeparatedByGutters
+
+The columns of a table are the stretches of the layout text separated by a gutter
+of at least a declared width of blank positions, the same on every line.
+
+- **Where:** `TableLayoutParser._find_column_starts`, the width being declared
+  by each table.
+- **Status:** declared (width and patterns of each table).
+- **Proposal:** none: it is a parameter of a table, not a belief of the book.
+
+### Declared by the book, as patterns or hooks
+
+The package cannot hold these (it knows no book). It can name the belief, so
+that a book declares it as a rule instead of burying it in a pattern.
+
+#### ChapterTitleStartsThePage
+
+A page opens a chapter when the title pattern appears within the first characters
+of its text, and the title is the very start of the page text. A page can be
+declared to open a chapter, or not to.
+
+- **Where:** `ChapterSplitter.holds_new_chapter`, `get_chapter_name`,
+  `extract_chapter_name`; page keys `type`, `chapter_info`, `no_new_chapter`.
+- **Status:** declared (a pattern, a distance, and per-page declarations).
+- **Proposal:** leave as data: it is the structure of the book.
+
+#### IndentedLineStartsParagraph
+
+Inside a page, a line starting with a given indentation (four spaces, according
+to the documentation of `TextSanitizer`) starts a new paragraph.
+
+- **Where:** the paragraph breaking pattern of the splitter of a book
+  (`ParagraphAndBlockquoteSplitter`); the documentation of
+  `TextSanitizer.normalize_newlines_and_multiple_whitespaces` states it.
+- **Status:** declared, as a regular expression of the book.
+- **Why it matters:** this is the rule `IndentedTailStartsParagraph`, applied
+  inside a page and not across a page break. The merge across a page break
+  ignores the indent that the same book uses inside the page, because the
+  indent of the first line of a page is stripped (see
+  `PageTextLeadingWhitespaceIsMargin`). The two belong together.
+- **Proposal:** one rule (`IndentedLineStartsParagraph`), whose action sites
+  are the paragraph breaking pattern and `ParagraphMerger._continues`.
+
+#### PullQuoteIsRecognizedByItsIndentation, HeadingIsRecognizedByItsCentering
+
+A pull quote is recognized by a deeper indentation, a heading by its centering
+(patterns of the splitter of a book). A book that has them keeps the indent of
+the first line of a page, to recognize them at the very top of it.
+
+- **Where:** `ParagraphAndBlockquoteSplitter` (`blockquote_pattern`,
+  `heading_pattern`) and the book override of
+  `strip_page_text_leading_whitespace`.
+- **Status:** declared, as patterns.
+- **Proposal:** leave as patterns; mention them as the reason of the override.
+
+#### RunningHeaderIsRemovedByPattern, KeyPointIsAPullQuote, DropCapIsRepaired
+
+Each book may have a sanitizer (`StructuralInfoBase.sanitize_page_text`) that
+removes the running header of a page, turns the key points set apart on a page
+into pull quotes, or repairs the drop cap of an illuminated initial.
+
+- **Where:** the book hooks. The package default does nothing.
+- **Status:** declared, as code of the book.
+- **Proposal:** a rule each (the belief is typographic), declared by the books
+  that need it; the action site is the sanitizer, the trap is a page where the
+  pattern finds nothing (or finds more than once).
+
+### Declared by the book, as data
+
+Not beliefs, so not rules: `typo_and_fix` (a regular expression and its fix, per
+page), `dropped_sections` (titles), `table_declarations`, `table_row_continues`
+(per page), `drop_page` (see `IllustrationRepeatingBodyIsDropped`),
+`convert_to_logical_page_number` (the number printed on a page).
+
 ## Rejected as universal
 
 - **A sentence is complete when it has a verb** (part of speech tagging).

@@ -169,10 +169,29 @@ class TestIsNextItem:
 
 
 class TestHeuristicsSwitch:
-    def test_enabled_by_default(self):
+    def test_the_heuristics_are_a_rule_that_a_document_holds_or_not(self):
         from pdf_to_markdown import StructuralInfoBase
 
-        assert StructuralInfoBase.numbered_list_heuristics_enabled.fget(None) is True
+        class _StructuralInfo(StructuralInfoBase):
+            pages_info = {}
+            total_page_number = 1
+
+        assert (
+            _StructuralInfo().rule_if_holds(
+                "NumberedItemStartingAPageIsNotAContinuation"
+            )
+            is None
+        )
+
+        _StructuralInfo.valid_rules = frozenset(
+            {"NumberedItemStartingAPageIsNotAContinuation"}
+        )
+        assert (
+            _StructuralInfo().rule_if_holds(
+                "NumberedItemStartingAPageIsNotAContinuation"
+            )
+            is not None
+        )
 
 
 class TestFailureNote:

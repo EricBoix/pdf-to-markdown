@@ -1,12 +1,10 @@
-import re
-
 from .Model import (
     BlockQuoteParagraph,
     DocumentHierarchicalLevel,
     Paragraph,
 )
 from .DiagnosticsReporter import DiagnosticsReporter
-from .TextSanitizer import TextSanitizer
+from .typo_rules import BlockquoteRepeatingParagraphIsDropped
 
 
 class BlockquoteDeduplicator:
@@ -34,19 +32,16 @@ class BlockquoteDeduplicator:
     were reconstituted (see ParagraphMerger).
     """
 
-    def __init__(self, diagnostics: DiagnosticsReporter | None = None) -> None:
+    def __init__(
+        self,
+        rule: BlockquoteRepeatingParagraphIsDropped | None = None,
+        diagnostics: DiagnosticsReporter | None = None,
+    ) -> None:
+        # The rule BlockquoteRepeatingParagraphIsDropped, handed over by the
+        # structural information when the document holds it. Without it no
+        # blockquote is dropped.
+        self._rule = rule
         self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
-
-    @staticmethod
-    def _normalize(text: str) -> str:
-        """Text that only differs by whitespace (e.g. line folding, hyphenation
-        artifacts such as "non- perceiving") or typographic characters
-        (quotes, dashes...) normalizes to the same value.
-
-        The sentences that come out of a pdf are ASCII already (see
-        TextExtractor). Those of a document that was not extracted from a pdf
-        (see MarkdownToDocument) keep their typographic characters."""
-        return re.sub(r"\s+", "", TextSanitizer.sanitize_characters(text))
 
     def _collect_paragraphs(self, level: DocumentHierarchicalLevel) -> list[Paragraph]:
         return [
@@ -64,23 +59,9 @@ class BlockquoteDeduplicator:
             page_numbers.add(sentence.page_layout.page_number)
         return page_numbers
 
-    def _is_made_of_whole_sentences(
-        self, normalized_blockquote: str, paragraph: Paragraph
-    ) -> bool:
-        normalized_sentences = [
-            self._normalize(sentence.text) for sentence in paragraph.get_sentences()
-        ]
-        for first_index in range(len(normalized_sentences)):
-            accumulated_text = ""
-            for sentence_text in normalized_sentences[first_index:]:
-                accumulated_text += sentence_text
-                if accumulated_text == normalized_blockquote:
-                    return True
-                if not normalized_blockquote.startswith(accumulated_text):
-                    break
-        return False
-
     def remove_duplicated_blockquotes(self, document) -> None:
+        if self._rule is None:
+            return
         paragraphs = []
         for chapter in document.get_chapters():
             paragraphs += self._collect_paragraphs(chapter)
@@ -100,7 +81,7 @@ class BlockquoteDeduplicator:
                 continue
             if not blockquote.get_sentences():
                 continue
-            normalized_blockquote = self._normalize(
+            normalized_blockquote = self._rule.normalize(
                 "".join(sentence.text for sentence in blockquote.get_sentences())
             )
             if not normalized_blockquote:
@@ -112,15 +93,20 @@ class BlockquoteDeduplicator:
                 blockquote_page_number + 1,
             ):
                 if any(
-                    self._is_made_of_whole_sentences(normalized_blockquote, paragraph)
+                    self._rule.is_made_of_whole_sentences(
+                        normalized_blockquote, paragraph
+                    )
                     for paragraph in candidates_per_page.get(page_number, [])
                 ):
                     duplicated_blockquotes.append(blockquote)
                     break
 
         for blockquote in duplicated_blockquotes:
+            # Rule BlockquoteRepeatingParagraphIsDropped (its trap: what is
+            # dropped is reported with its page)
             self._diagnostics.debug(
-                f"Dropping blockquote duplicating a paragraph: "
+                f"Dropping blockquote duplicating a paragraph (page "
+                f"{blockquote.page_layout.page_number + 1}): "
                 f"{blockquote.get_document_reference_long()}"
             )
             parent = blockquote.owning_hierarchical_level

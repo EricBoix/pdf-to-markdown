@@ -38,7 +38,9 @@ class DocumentBreaker:
         self._validate_all_pages()
 
         # Pre-extract all page texts
-        text_extractor = TextExtractor(self.reader, structural_info)
+        text_extractor = TextExtractor(
+            self.reader, structural_info, diagnostics=self._diagnostics
+        )
         self.extracted_texts = text_extractor.extract_all()
         self.removed_first_line_indentations = (
             text_extractor.removed_first_line_indentations

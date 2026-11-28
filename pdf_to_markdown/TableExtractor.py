@@ -36,6 +36,11 @@ class TableExtractor:
     ) -> None:
         self._structural_info = structural_info
         self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
+        # The rule comes from the structural information (None when the
+        # document does not hold it)
+        self._row_cut_rule = structural_info.rule_if_holds(
+            "TableRowCutHasEmptyCellAndLowercaseStart"
+        )
         self._declarations = structural_info.table_declarations
         self._registry = table_registry
         self._parser = TableLayoutParser(self._diagnostics)
@@ -197,8 +202,9 @@ class TableExtractor:
     ) -> tuple[bool, str]:
         """Whether a row of a table was cut in two by a page break.
 
-        The decision declared by the structural information wins. Otherwise a
-        row is taken for cut when two signals come together: a cell is empty
+        The decision declared by the structural information wins. Otherwise,
+        when the document holds the rule TableRowCutHasEmptyCellAndLowercaseStart,
+        a row is taken for cut when two signals come together: a cell is empty
         in the last row of the previous page while it holds text in the first
         row of the next page, and a cell of the first row of the next page
         starts with a lowercase letter (the text goes on).
@@ -210,11 +216,9 @@ class TableExtractor:
         declared = self._structural_info.get_table_row_continues(page_number)
         if declared is not None:
             return declared, "declared in the structural information"
-        complementary_cell = any(
-            not previous_cell and new_cell
-            for previous_cell, new_cell in zip(last_row, first_new_row)
-        )
-        lowercase_start = any(cell[:1].islower() for cell in first_new_row)
-        if complementary_cell and lowercase_start:
-            return True, "empty cell completed and lowercase start"
-        return False, "no complementary empty cell or no lowercase start"
+        # Rule TableRowCutHasEmptyCellAndLowercaseStart, see
+        # docs/rules_configurable.md (a document that does not hold it never
+        # merges a row it was not told to merge)
+        if self._row_cut_rule is None:
+            return False, "the document does not hold the rule of the cut rows"
+        return self._row_cut_rule.row_continues(last_row, first_new_row)

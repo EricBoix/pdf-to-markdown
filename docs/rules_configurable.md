@@ -77,6 +77,62 @@ flow). The converter relies on it wherever it reads the text of a page.
   breaks must strictly increase. The order of the pages only, not the order
   inside a page.
 
+## SpacedEllipsisIsAnEllipsis
+
+Dots separated by spaces (". . .") are one ellipsis, spelled "...". The sentence
+tokenizer would otherwise cut it into one sentence per dot.
+
+- **Code:** `typo_rules/SpacedEllipsisIsAnEllipsis.py`; action site
+  `TextExtractor.extract_all`. Without the rule the dots are left as they are.
+- **Trap:** the number of spaced ellipses of each page is reported (debug).
+
+## LayoutTextCarriesIndentationAndColumns
+
+The text extracted by pypdf in layout mode keeps what the patterns of a book read:
+the indentation of a line, the centering of a title, the columns of a table.
+
+- **Code:** `typo_rules/LayoutTextCarriesIndentationAndColumns.py`; action site
+  `TextExtractor.extract_all`.
+- **Trap:** a page that pypdf cannot extract in layout mode falls back to plain
+  text: the converter warns, naming the page.
+
+## BlockquoteRepeatingParagraphIsDropped
+
+A pull quote made of one or more complete sentences of a paragraph of the same,
+the previous or the next page is a duplicate and is dropped. The rule removes text
+from the document.
+
+- **Code:** `typo_rules/BlockquoteRepeatingParagraphIsDropped.py`; action site
+  `BlockquoteDeduplicator`. Without the rule no blockquote is dropped.
+- **Trap:** each dropped blockquote is reported with its page (debug).
+
+## NumberedItemStartingAPageIsNotAContinuation
+
+The numbering of a document is trustworthy, its layout is not: a paragraph that
+starts a page with the number following the last item above is the next item, not
+the end of a cut paragraph; a numbering that restarts at 1 inside an open list is
+a nested list; a paragraph between two items belongs to the item above.
+
+- **Code:** `typo_rules/NumberedItemStartingAPageIsNotAContinuation.py`; action
+  sites `ParagraphMerger` and the annotation of the numbered lists of a level
+  (`ConverterBase` sets the flag of the document from the rule). It replaces the
+  former `StructuralInfoBase.numbered_list_heuristics_enabled`.
+- **Trap:** a numbered item that belongs to no list is kept and reported
+  (`NumberedListAnnotator`).
+
+## TableRowCutHasEmptyCellAndLowercaseStart
+
+A row of a table was cut by a page break when a cell is empty in the last row of
+the page while it holds text in the first row of the next page, and a cell of
+that first row starts with a lowercase letter. The declaration of a page
+(`table_row_continues`) wins over the rule.
+
+- **Code:** `typo_rules/TableRowCutHasEmptyCellAndLowercaseStart.py`; action site
+  `TableExtractor._decide_row_continuation`. Without the rule a row is merged
+  only when the page declares it.
+- **Trap:** the decision and its reason are reported for each page break of a
+  table (warning).
+
 ## Which book declares which rule
 
 Each book declares its rules in the structural information it derives from

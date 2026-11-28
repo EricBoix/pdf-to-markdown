@@ -20,6 +20,12 @@ body. A reader who cites a heading must land on its exact page.
   its name is printed, and its text keeps the page it is printed on. A
   `Heading` (a sub-title that no level stands for) is created with the page of
   the text it was cut from, which is the page where it is printed.
+- **Action site:** `LevelBreaker.break_into_sublevels` asks the rule
+  (`HeadingIsOnItsPrintedPage.page_of_level`) for the page of the level; the rule
+  comes from the rule register of the structural information.
+- **Trap:** `HeadingIsOnItsPrintedPage.contradicted_by` warns when the level is
+  not on the page of its name. It runs where the rule acts: it cannot see a
+  heading that other code put on a wrong page (only the oracle can, partially).
 
 ## TableRowIsOnItsPrintedPage
 
@@ -28,6 +34,10 @@ Each row of a table belongs to the page where the PDF prints it.
 - **Met by the code:** not yet. A `Table` carries a single page, so the rows of
   a table cut by a page break are attributed to the page where the table starts.
   Splitting a table per page is not planned yet.
+- **Action site:** none, no code acts on it yet. The rule is registered and
+  documented so that the gap is named; the test
+  `tests/test_typo_rules_are_used.py` lists it as the one rule without an action
+  site.
 
 ## Facts the code relies on
 

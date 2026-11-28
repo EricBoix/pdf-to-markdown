@@ -8,6 +8,7 @@ from .Model import (
     Table,
 )
 from .PageLayout import PageLayout
+from .typo_rules import ReadingOrderIsLineOrder
 
 
 class PageBreakInserter:
@@ -24,13 +25,20 @@ class PageBreakInserter:
 
     The pages of the page breaks must then strictly increase: a page that comes
     twice, or a page that comes back, means that the document is not in the order
-    of its pages (e.g. a text moved across a page break). It is reported as a
-    warning, or as an error when *strict* is set (meant for the tests).
+    of its pages (e.g. a text moved across a page break). This is the trap of the
+    rule ReadingOrderIsLineOrder, which the structural information hands over
+    when the document holds it (*reading_order_rule*, None: the order of the pages
+    is not checked). It is reported as a warning, or as an error when *strict* is
+    set (meant for the tests).
     """
 
     def __init__(
-        self, diagnostics: DiagnosticsReporter | None = None, strict: bool = False
+        self,
+        reading_order_rule: ReadingOrderIsLineOrder | None = None,
+        diagnostics: DiagnosticsReporter | None = None,
+        strict: bool = False,
     ) -> None:
+        self._reading_order_rule = reading_order_rule
         self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
         self._strict = strict
         self._current_page_number: int | None = None
@@ -118,17 +126,11 @@ class PageBreakInserter:
         paragraph.sublevels = with_page_breaks
 
     def _check_the_order_of_the_pages(self) -> None:
-        for (previous, previous_before), (current, current_before) in zip(
-            self._page_breaks, self._page_breaks[1:]
-        ):
-            previous_pdf_page = previous.page_layout.page_number + 1
-            current_pdf_page = current.page_layout.page_number + 1
-            if current_pdf_page <= previous_pdf_page:
-                self.violations.append(
-                    f"The page break to pdf page {current_pdf_page} ({current_before}) "
-                    f"follows the one to pdf page {previous_pdf_page} "
-                    f"({previous_before}): the pages are not in order."
-                )
+        # Rule ReadingOrderIsLineOrder, see docs/rules_configurable.md
+        if self._reading_order_rule is not None:
+            self.violations = self._reading_order_rule.order_violations(
+                self._page_breaks
+            )
         for violation in self.violations:
             self._diagnostics.warn(violation)
         if self.violations and self._strict:

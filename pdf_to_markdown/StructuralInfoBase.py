@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from .Errors import ConverterError
 from .PageInfo import PageInfo
 from .TableDeclaration import TableDeclaration
-from .typo_rules import TypoRuleRegister, TypoRuleStatus
+from .typo_rules import TypoRule, TypoRuleRegister, TypoRuleStatus
 
 
 class StructuralInfoBase(ABC):
@@ -140,7 +140,7 @@ class StructuralInfoBase(ABC):
 
         A name that is not the one of a rule is an error: it is a typo.
         """
-        if not self._rule_register.get(rule_name).configurable:
+        if not self.rule_register.get(rule_name).configurable:
             return TypoRuleStatus.HOLDS
         if rule_name in self.valid_rules:
             return TypoRuleStatus.HOLDS
@@ -151,11 +151,20 @@ class StructuralInfoBase(ABC):
     def rule_holds(self, rule_name: str) -> bool:
         return self.rule_status(rule_name) is TypoRuleStatus.HOLDS
 
+    def rule_if_holds(self, rule_name: str) -> TypoRule | None:
+        """The rule when the document holds it, None otherwise. This is how the
+        code that acts on a rule gets it: the rules flow from the structural
+        information (rule_register), the code never builds a register of its
+        own."""
+        if not self.rule_holds(rule_name):
+            return None
+        return self.rule_register.get(rule_name)
+
     def _check_rule_declarations(self) -> None:
         """Refuse a declaration naming no rule, an implicit rule, or a rule that
         is both valid and rejected."""
         for rule_name in self.valid_rules | self.rejected_rules:
-            if not self._rule_register.get(rule_name).configurable:
+            if not self.rule_register.get(rule_name).configurable:
                 raise ConverterError(
                     f"The rule {rule_name} is implicit (always true): "
                     "a document does not declare it."
@@ -198,7 +207,9 @@ class StructuralInfoBase(ABC):
         self._chapter_splitter_instance = None
         # See page_info()
         self._page_infos = None
-        self._rule_register = TypoRuleRegister.default()
+        # The typographic rules, handed to the code that acts on them (the only
+        # place where the register of the package is built)
+        self.rule_register = TypoRuleRegister.default()
         self._check_rule_declarations()
 
     def get_chapter_splitter(self):

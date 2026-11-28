@@ -20,6 +20,7 @@ from pdf_to_markdown import (
     TopLevelChapterOfParagraphs,
 )
 from pdf_to_markdown.Model import DocumentHierarchicalLevel
+from pdf_to_markdown.typo_rules import ReadingOrderIsLineOrder
 from pdf_to_markdown.NumberedListAnnotator import (
     NumberedListAnnotator,
     NumberedListPlacement,
@@ -231,7 +232,7 @@ class TestOrderOfThePages:
         )
 
     def test_pages_in_order_are_not_reported(self):
-        inserter = PageBreakInserter(strict=True)
+        inserter = PageBreakInserter(ReadingOrderIsLineOrder(), strict=True)
         document = Document("Test")
         document.add_chapter(
             _chapter(_paragraph(("First.", PAGE_IV)), _paragraph(("Second.", PAGE_V)))
@@ -242,32 +243,48 @@ class TestOrderOfThePages:
     def test_a_page_that_comes_back_is_reported_with_its_context(self):
         document = Document("Test")
         document.add_chapter(self._oscillating_chapter())
-        inserter = PageBreakInserter()
+        inserter = PageBreakInserter(ReadingOrderIsLineOrder())
         inserter.insert_page_breaks(document)
         assert len(inserter.violations) == 1
         assert "pdf page 4" in inserter.violations[0]
         assert "pdf page 5" in inserter.violations[0]
         assert "before Paragraph" in inserter.violations[0]
 
+    def test_the_order_is_not_checked_without_the_rule(self):
+        document = Document("Test")
+        document.add_chapter(self._oscillating_chapter())
+        inserter = PageBreakInserter()
+        inserter.insert_page_breaks(document)
+        assert inserter.violations == []
+
+    def test_a_violation_names_the_rule(self):
+        document = Document("Test")
+        document.add_chapter(self._oscillating_chapter())
+        inserter = PageBreakInserter(ReadingOrderIsLineOrder())
+        inserter.insert_page_breaks(document)
+        assert "ReadingOrderIsLineOrder" in inserter.violations[0]
+
     def test_a_violation_is_warned_about(self, caplog):
         document = Document("Test")
         document.add_chapter(self._oscillating_chapter())
         with caplog.at_level("WARNING", logger="pdf_to_markdown"):
-            PageBreakInserter().insert_page_breaks(document)
+            PageBreakInserter(ReadingOrderIsLineOrder()).insert_page_breaks(document)
         assert "the pages are not in order" in caplog.text
 
     def test_a_violation_is_an_error_when_strict(self):
         document = Document("Test")
         document.add_chapter(self._oscillating_chapter())
         with pytest.raises(ConverterError, match="the pages are not in order"):
-            PageBreakInserter(strict=True).insert_page_breaks(document)
+            PageBreakInserter(
+                ReadingOrderIsLineOrder(), strict=True
+            ).insert_page_breaks(document)
 
     def test_a_page_break_within_a_paragraph_is_checked_too(self):
         document = Document("Test")
         document.add_chapter(
             _chapter(_paragraph(("First.", PAGE_V), ("Second.", PAGE_IV)))
         )
-        inserter = PageBreakInserter()
+        inserter = PageBreakInserter(ReadingOrderIsLineOrder())
         inserter.insert_page_breaks(document)
         assert len(inserter.violations) == 1
         assert "inside a paragraph" in inserter.violations[0]

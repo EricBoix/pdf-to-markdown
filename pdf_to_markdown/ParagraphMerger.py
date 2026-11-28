@@ -9,7 +9,7 @@ from .DiagnosticsReporter import DiagnosticsReporter
 from .NumberedListAnnotator import NumberedListAnnotator
 from .Errors import ConverterError
 from .Model import Sentence
-from .typo_rules import TypoRuleRegister, TypoRuleVerdict
+from .typo_rules import TypoRuleForMerge, TypoRuleVerdict
 
 
 class ParagraphMerger:
@@ -35,7 +35,10 @@ class ParagraphMerger:
     ) -> None:
         self.structural_info = structural_info
         self._diagnostics = DiagnosticsReporter.default_if_none(diagnostics)
-        self._merge_rules = TypoRuleRegister.default().merge_rules()
+        # The rules come from the rule register of the structural information
+        self._merge_rules: list[TypoRuleForMerge] = (
+            structural_info.rule_register.merge_rules()
+        )
 
     def _continues(self, head: Sentence, tail: Sentence) -> bool:
         """Whether the tail (the first sentence of a page) continues the head (the

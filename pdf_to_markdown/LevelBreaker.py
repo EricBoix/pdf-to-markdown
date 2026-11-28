@@ -15,6 +15,7 @@ from .TableRegistry import TableRegistry
 from .TextSanitizer import TextSanitizer
 from .DiagnosticsReporter import DiagnosticsReporter
 from .Errors import ConverterError
+from .typo_rules import HeadingIsOnItsPrintedPage
 
 
 class Splitter(Protocol):
@@ -63,9 +64,13 @@ class LevelBreaker:
         break_paragraphs_callback: Callable[
             [DocumentHierarchicalLevel, list[ContentWithLayout] | None], None
         ],
+        heading_rule: HeadingIsOnItsPrintedPage,
         diagnostics: DiagnosticsReporter | None = None,
         table_registry: TableRegistry | None = None,
     ) -> None:
+        # The rule (implicit) comes from the rule register of the structural
+        # information of the document
+        self._heading_rule = heading_rule
         self.level = level
         self.level_splitter = level_splitter
         self.sublevel_factory = sublevel_factory
@@ -132,11 +137,18 @@ class LevelBreaker:
 
                 new_sublevel, parts = self._try_create_sublevel(new_layout, parts)
                 if new_sublevel:
-                    if name_layout is not None:
-                        # The text of the sub-level was broken with the page it is
-                        # printed on (_try_create_sublevel), the sub-level itself
-                        # is on the page of its name.
-                        new_sublevel.page_layout = name_layout.__copy__()
+                    # Rule HeadingIsOnItsPrintedPage, see docs/rules_implicit.md
+                    # The text of the sub-level was broken with the page it is
+                    # printed on (_try_create_sublevel), the sub-level itself
+                    # is on the page of its name.
+                    new_sublevel.page_layout = self._heading_rule.page_of_level(
+                        name_layout, new_layout
+                    )
+                    if self._heading_rule.contradicted_by(new_sublevel, name_layout):
+                        self._diagnostics.warn(
+                            f"The rule {self._heading_rule.name} does not hold for "
+                            f"{new_sublevel}: it is not on the page of its name."
+                        )
                     name_layout = None
                     current_level = new_sublevel
                     continue

@@ -14,6 +14,7 @@ from pdf_to_markdown import (
     SuperChapter,
 )
 from pdf_to_markdown.LevelBreaker import LevelBreaker, TextWithLayout
+from pdf_to_markdown.typo_rules import HeadingIsOnItsPrintedPage
 
 
 def test_part_is_a_value():
@@ -50,6 +51,7 @@ def test_text_before_the_first_sub_chapter_is_given_to_the_paragraph_breaker():
         level_splitter=SinglePatternSplitter(r"\d+\. [A-Za-z ]+\n", r"[A-Za-z ]+"),
         sublevel_factory=sub_chapter_factory,
         break_level_callback=lambda level: None,
+        heading_rule=HeadingIsOnItsPrintedPage(),
         break_paragraphs_callback=lambda level, contents: (
             broken_paragraph_contents.extend(contents)
         ),
@@ -70,7 +72,7 @@ class TestNameEndingAPage:
     """A sub-chapter name that is the last line of a page is printed on that page,
     whereas the text it names starts on the next one (HeadingIsOnItsPrintedPage)."""
 
-    def _break_two_pages(self):
+    def _break_two_pages(self, heading_rule=None):
         super_chapter = SuperChapter("Part One")
         first_page = ExtractedPage(3, PageLayout("iv", 3), None)
         first_page.set_text("1. Alpha\nBody of alpha.\n2. Beta\n")
@@ -97,6 +99,7 @@ class TestNameEndingAPage:
             level_splitter=SinglePatternSplitter(r"\d+\. [A-Za-z ]+\n", r"[A-Za-z ]+"),
             sublevel_factory=sub_chapter_factory,
             break_level_callback=break_level,
+            heading_rule=heading_rule or HeadingIsOnItsPrintedPage(),
             break_paragraphs_callback=lambda level, contents: None,
         ).break_into_sublevels()
         return super_chapter, pages_of_the_text_of_the_levels
@@ -111,3 +114,29 @@ class TestNameEndingAPage:
     def test_its_text_is_still_broken_with_the_page_it_is_printed_on(self):
         _, pages_of_the_text_of_the_levels = self._break_two_pages()
         assert pages_of_the_text_of_the_levels == {"Alpha": 3, "Beta": 4}
+
+    def test_the_page_of_the_level_is_the_decision_of_the_rule(self):
+        class RuleKeepingThePageOfTheText(HeadingIsOnItsPrintedPage):
+            def page_of_level(self, name_layout, text_layout):
+                return text_layout
+
+        super_chapter, _ = self._break_two_pages(RuleKeepingThePageOfTheText())
+        _, beta = super_chapter.get_sublevels()
+        assert beta.page_layout.page_number == 4
+
+    def test_the_rule_warns_about_a_level_that_is_not_on_the_page_of_its_name(
+        self, caplog
+    ):
+        class RuleKeepingThePageOfTheText(HeadingIsOnItsPrintedPage):
+            def page_of_level(self, name_layout, text_layout):
+                return text_layout
+
+        with caplog.at_level("WARNING", logger="pdf_to_markdown"):
+            self._break_two_pages(RuleKeepingThePageOfTheText())
+        assert "does not hold" in caplog.text
+        assert "not on the page of its name" in caplog.text
+
+    def test_the_rule_is_silent_when_the_level_is_on_the_page_of_its_name(self, caplog):
+        with caplog.at_level("WARNING", logger="pdf_to_markdown"):
+            self._break_two_pages()
+        assert "does not hold" not in caplog.text

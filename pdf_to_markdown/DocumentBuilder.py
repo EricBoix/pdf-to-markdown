@@ -24,6 +24,7 @@ from .BlockquoteDeduplicator import BlockquoteDeduplicator
 from .PageBreakInserter import PageBreakInserter
 from .SectionDropper import SectionDropper
 from .TableRegistry import SpanningCellText, TableRegistry
+from .typo_rules import HeadingIsOnItsPrintedPage
 
 
 class ContentWithLayout(Protocol):
@@ -57,7 +58,10 @@ class DocumentBuilder(TextSanitizer, ABC):
         self._blockquote_deduplicator = BlockquoteDeduplicator(
             diagnostics=self._diagnostics
         )
-        self._page_break_inserter = PageBreakInserter(diagnostics=self._diagnostics)
+        self._page_break_inserter = PageBreakInserter(
+            reading_order_rule=structural_info.rule_if_holds("ReadingOrderIsLineOrder"),
+            diagnostics=self._diagnostics,
+        )
 
     def build_document(self) -> None:
         """Build the Document object out of converter extracted chapters."""
@@ -118,6 +122,11 @@ class DocumentBuilder(TextSanitizer, ABC):
         if table.caption:
             table.caption = sanitize_cell(table.caption)
 
+    def _heading_rule(self) -> HeadingIsOnItsPrintedPage:
+        """The implicit rule HeadingIsOnItsPrintedPage (always true), from the
+        rules of the structural information."""
+        return self.structural_info.rule_register.get("HeadingIsOnItsPrintedPage")
+
     def break_any_level_chapter_into_paragraphs(
         self, chapter, contents: list[ContentWithLayout] | None = None
     ) -> None:
@@ -128,6 +137,7 @@ class DocumentBuilder(TextSanitizer, ABC):
             sublevel_factory=Paragraph,
             break_level_callback=self.break_level,
             break_paragraphs_callback=self.break_any_level_chapter_into_paragraphs,
+            heading_rule=self._heading_rule(),
             diagnostics=self._diagnostics,
             table_registry=self._table_registry,
         )
@@ -146,6 +156,7 @@ class DocumentBuilder(TextSanitizer, ABC):
             sublevel_factory=subchapter_factory,
             break_level_callback=self.break_level,
             break_paragraphs_callback=self.break_any_level_chapter_into_paragraphs,
+            heading_rule=self._heading_rule(),
             diagnostics=self._diagnostics,
         )
         breaker.break_into_sublevels()

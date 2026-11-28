@@ -70,7 +70,12 @@ flow). The converter relies on it wherever it reads the text of a page.
 
 - **Exceptions inside it:** floats such as pull quotes and the text of an
   illustration, interleaved in line order inside a paragraph.
-- **Trap:** the order of the pages only, not the order inside a page.
+- **Code:** `typo_rules/ReadingOrderIsLineOrder.py`; action site
+  `PageBreakInserter` (it gets the rule from the structural information only when
+  the document declares it).
+- **Trap:** `ReadingOrderIsLineOrder.order_violations`: the pages of the page
+  breaks must strictly increase. The order of the pages only, not the order
+  inside a page.
 
 ## Which book declares which rule
 

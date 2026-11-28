@@ -1,4 +1,4 @@
-"""PageMarker: where the sentences come from, written in the markdown."""
+"""PageMarker and PageBreak: where the sentences come from, written in the markdown."""
 
 import re
 
@@ -7,16 +7,19 @@ from mdutils.mdutils import MdUtils
 
 from pdf_to_markdown import (
     BlockQuoteParagraph,
+    ConverterError,
     Document,
     Heading,
+    PageBreak,
+    PageBreakInserter,
     PageLayout,
     PageMarker,
-    PageMarkerTracker,
     Paragraph,
     Sentence,
     Table,
     TopLevelChapterOfParagraphs,
 )
+from pdf_to_markdown.Model import DocumentHierarchicalLevel
 from pdf_to_markdown.NumberedListAnnotator import (
     NumberedListAnnotator,
     NumberedListPlacement,
@@ -29,7 +32,7 @@ PAGE_IV = PageLayout("iv", 3)
 PAGE_V = PageLayout("v", 4)
 PAGE_SIX = PageLayout(6, 5)
 
-INLINE_MARKER = re.compile(r" <!-- page reader=\S+ pdf=\d+ -->")
+MARKER_LINE = re.compile(r"(?:\s*> |\s*)<!-- page reader=\S+ pdf=\d+ -->")
 
 
 def _paragraph(*sentences, paragraph_class=Paragraph):
@@ -50,19 +53,28 @@ def _chapter(*leaves, layout=PAGE_IV):
     return chapter
 
 
-# (inline markers by default here: the tests of the default are explicit)
-def _lines(chapter, page_markers=True, maximum_line_length=None, on_own_line=False):
-    """The markdown of a chapter, as lines (the blank lines kept)."""
+def _document(chapter, maximum_line_length=None):
+    """The document holding the chapter, with its page breaks."""
     document = Document("Test")
     document.add_chapter(chapter)
     document.maximum_line_length = maximum_line_length
+    PageBreakInserter().insert_page_breaks(document)
+    return document
+
+
+def _lines(chapter, page_markers=True, maximum_line_length=None):
+    """The markdown of a chapter, as lines (the blank lines kept)."""
+    document = _document(chapter, maximum_line_length)
     md_file = MdUtils(file_name="unused")
-    chapter.to_markdown(
-        md_file,
-        level=2,
-        page_markers=PageMarkerTracker(on_own_line) if page_markers else None,
+    DocumentHierarchicalLevel.write_sublevels_to_markdown(
+        md_file, document.get_chapters_with_page_breaks(), 2, page_markers
     )
     return md_file.file_data_text.strip("\n").split("\n")
+
+
+def _kinds(level):
+    """The kinds of the sublevels of a level, the page breaks included."""
+    return [type(sublevel).__name__ for sublevel in level.sublevels]
 
 
 class TestPageMarkerSyntax:
@@ -94,25 +106,171 @@ class TestPageMarkerSyntax:
         assert PageMarker.parse("<!-- omit from pdf-to-markdown: practical -->") is None
 
 
-class TestPageMarkerTracker:
-    def test_first_text_gets_a_marker_then_only_changes_of_page(self):
-        tracker = PageMarkerTracker()
-        assert tracker.comment_for(PAGE_IV) == "<!-- page reader=iv pdf=4 -->"
-        assert tracker.comment_for(PAGE_IV) is None
-        assert tracker.comment_for(PAGE_V) == "<!-- page reader=v pdf=5 -->"
-        assert tracker.comment_for(PAGE_V) is None
+class TestPageBreak:
+    def test_comment_is_the_marker_of_the_page(self):
+        assert PageBreak(PAGE_IV).comment == "<!-- page reader=iv pdf=4 -->"
 
-    def test_going_back_to_a_page_is_a_change(self):
-        tracker = PageMarkerTracker()
-        tracker.comment_for(PAGE_IV)
-        tracker.comment_for(PAGE_V)
-        assert tracker.comment_for(PAGE_IV) is not None
+    def test_a_page_break_has_no_sentences(self):
+        assert PageBreak(PAGE_IV).get_sentences() is None
 
-    def test_unknown_layout_leaves_the_current_page_alone(self):
-        tracker = PageMarkerTracker()
-        tracker.comment_for(PAGE_IV)
-        assert tracker.comment_for(None) is None
-        assert tracker.comment_for(PAGE_IV) is None
+    def test_a_page_break_holds_a_copy_of_the_layout(self):
+        layout = PageLayout("iv", 3)
+        page_break = PageBreak(layout)
+        assert page_break.page_layout.page_number == layout.page_number
+        assert page_break.page_layout.reader_page_number == layout.reader_page_number
+        assert page_break.page_layout is not layout
+
+
+class TestPageBreakInserter:
+    def test_first_text_gets_a_page_break_then_only_changes_of_page(self):
+        chapter = _chapter(
+            _paragraph(("First.", PAGE_IV)),
+            _paragraph(("Second.", PAGE_V)),
+            _paragraph(("Third.", PAGE_V)),
+        )
+        document = _document(chapter)
+        assert _kinds(document) == ["PageBreak", "TopLevelChapterOfParagraphs"]
+        assert _kinds(chapter) == ["Paragraph", "PageBreak", "Paragraph", "Paragraph"]
+        assert [
+            page_break.page_layout.page_number
+            for page_break in (document.sublevels[0], chapter.sublevels[1])
+        ] == [3, 4]
+
+    def test_page_break_within_a_paragraph_stands_before_the_sentence(self):
+        paragraph = _paragraph(
+            ("First.", PAGE_IV), ("Second.", PAGE_IV), ("Third.", PAGE_V)
+        )
+        _document(_chapter(paragraph))
+        assert _kinds(paragraph) == ["Sentence", "Sentence", "PageBreak", "Sentence"]
+
+    def test_page_breaks_are_no_element_of_the_document(self):
+        paragraph = _paragraph(("First.", PAGE_IV), ("Second.", PAGE_V))
+        chapter = _chapter(paragraph, _paragraph(("Third.", PAGE_V)))
+        document = _document(chapter)
+        assert document.get_chapters() == [chapter]
+        assert len(chapter.get_sublevels()) == 2
+        assert [sentence.text for sentence in paragraph.get_sentences()] == [
+            "First.",
+            "Second.",
+        ]
+        assert [sentence.number for sentence in paragraph.get_sentences()] == [1, 2]
+
+    def test_page_breaks_do_not_shift_the_numbers(self):
+        chapter = _chapter(
+            _paragraph(("First.", PAGE_IV)), _paragraph(("Second.", PAGE_V))
+        )
+        _document(chapter)
+        chapter.renumber_sublevels()
+        assert [leaf.number for leaf in chapter.get_sublevels()] == [1, 2]
+
+    def test_leaves_in_reading_order_yield_the_page_breaks_between_leaves(self):
+        chapter = _chapter(
+            _paragraph(("First.", PAGE_IV)), _paragraph(("Second.", PAGE_V))
+        )
+        _document(chapter)
+        assert [type(leaf).__name__ for leaf in chapter.leaves_in_reading_order()] == [
+            "Paragraph",
+            "PageBreak",
+            "Paragraph",
+        ]
+
+    def test_level_without_a_known_page_gets_no_page_break(self):
+        chapter = _chapter(_paragraph(("First.", PAGE_IV)), layout=None)
+        document = _document(chapter)
+        # The first page is the one of the first paragraph: the page break stands
+        # inside the chapter, after its header.
+        assert _kinds(document) == ["TopLevelChapterOfParagraphs"]
+        assert _kinds(chapter) == ["PageBreak", "Paragraph"]
+
+    def test_paragraph_without_sentences_and_table_without_rows_leave_the_page_alone(
+        self,
+    ):
+        empty_paragraph = Paragraph(PAGE_V)
+        empty_table = Table(PAGE_SIX, "empty", None, True, [])
+        chapter = _chapter(
+            _paragraph(("First.", PAGE_IV)),
+            empty_paragraph,
+            empty_table,
+            _paragraph(("Second.", PAGE_V)),
+        )
+        _document(chapter)
+        assert _kinds(chapter) == [
+            "Paragraph",
+            "Paragraph",
+            "Table",
+            "PageBreak",
+            "Paragraph",
+        ]
+
+    def test_inserting_twice_gives_the_same_document(self):
+        chapter = _chapter(
+            _paragraph(("First.", PAGE_IV), ("Second.", PAGE_V)),
+            _paragraph(("Third.", PAGE_SIX)),
+        )
+        document = _document(chapter)
+        before = (_kinds(document), _kinds(chapter), _kinds(chapter.sublevels[0]))
+        PageBreakInserter().insert_page_breaks(document)
+        assert (
+            _kinds(document),
+            _kinds(chapter),
+            _kinds(chapter.sublevels[0]),
+        ) == before
+
+
+class TestOrderOfThePages:
+    """The pages of the page breaks strictly increase, or the order of the
+    document is not the one of its pages."""
+
+    def _oscillating_chapter(self):
+        # 198, 199, 198, 199: a text of the page 198 stands after one of the 199
+        return _chapter(
+            _paragraph(("First.", PAGE_IV)),
+            _paragraph(("Second.", PAGE_V)),
+            _paragraph(("Third.", PAGE_IV)),
+            _paragraph(("Fourth.", PAGE_V)),
+        )
+
+    def test_pages_in_order_are_not_reported(self):
+        inserter = PageBreakInserter(strict=True)
+        document = Document("Test")
+        document.add_chapter(
+            _chapter(_paragraph(("First.", PAGE_IV)), _paragraph(("Second.", PAGE_V)))
+        )
+        inserter.insert_page_breaks(document)
+        assert inserter.violations == []
+
+    def test_a_page_that_comes_back_is_reported_with_its_context(self):
+        document = Document("Test")
+        document.add_chapter(self._oscillating_chapter())
+        inserter = PageBreakInserter()
+        inserter.insert_page_breaks(document)
+        assert len(inserter.violations) == 1
+        assert "pdf page 4" in inserter.violations[0]
+        assert "pdf page 5" in inserter.violations[0]
+        assert "before Paragraph" in inserter.violations[0]
+
+    def test_a_violation_is_warned_about(self, caplog):
+        document = Document("Test")
+        document.add_chapter(self._oscillating_chapter())
+        with caplog.at_level("WARNING", logger="pdf_to_markdown"):
+            PageBreakInserter().insert_page_breaks(document)
+        assert "the pages are not in order" in caplog.text
+
+    def test_a_violation_is_an_error_when_strict(self):
+        document = Document("Test")
+        document.add_chapter(self._oscillating_chapter())
+        with pytest.raises(ConverterError, match="the pages are not in order"):
+            PageBreakInserter(strict=True).insert_page_breaks(document)
+
+    def test_a_page_break_within_a_paragraph_is_checked_too(self):
+        document = Document("Test")
+        document.add_chapter(
+            _chapter(_paragraph(("First.", PAGE_V), ("Second.", PAGE_IV)))
+        )
+        inserter = PageBreakInserter()
+        inserter.insert_page_breaks(document)
+        assert len(inserter.violations) == 1
+        assert "inside a paragraph" in inserter.violations[0]
 
 
 class TestMarkersOfTheLevelsAndTheLeaves:
@@ -142,9 +300,31 @@ class TestMarkersOfTheLevelsAndTheLeaves:
             "Third paragraph.",
         ]
 
-    def test_marker_inside_a_paragraph_sticks_to_the_previous_sentence(self):
+    def test_without_the_markers_the_markdown_is_the_one_of_a_document_without_page_breaks(
+        self,
+    ):
+        def chapter():
+            return _chapter(
+                _paragraph(("First.", PAGE_IV), ("Second.", PAGE_V)),
+                _paragraph(("Third.", PAGE_SIX)),
+            )
+
+        with_page_breaks = _lines(chapter(), page_markers=False)
+        document = Document("Test")
+        document.add_chapter(chapter())
+        md_file = MdUtils(file_name="unused")
+        DocumentHierarchicalLevel.write_sublevels_to_markdown(
+            md_file, document.get_chapters_with_page_breaks(), 2, False
+        )
+        assert with_page_breaks == md_file.file_data_text.strip("\n").split("\n")
+
+    def test_marker_inside_a_paragraph_is_a_line_of_its_own(self):
         chapter = _chapter(_paragraph(("First.", PAGE_IV), ("Second.", PAGE_V)))
-        assert _lines(chapter)[-1] == "First. <!-- page reader=v pdf=5 --> Second."
+        assert _lines(chapter)[-3:] == [
+            "First.",
+            "<!-- page reader=v pdf=5 -->",
+            "Second.",
+        ]
 
     def test_paragraph_merged_across_two_pages_is_marked_where_the_page_changes(self):
         # What ParagraphMerger leaves: the sentence cut by the page break keeps
@@ -156,10 +336,11 @@ class TestMarkersOfTheLevelsAndTheLeaves:
                 ("It is calm.", PAGE_V),
             )
         )
-        assert _lines(chapter)[-1] == (
-            "Many minds work. The conscious mind lets them cooperate. "
-            "<!-- page reader=v pdf=5 --> It is calm."
-        )
+        assert _lines(chapter)[-3:] == [
+            "Many minds work. The conscious mind lets them cooperate.",
+            "<!-- page reader=v pdf=5 -->",
+            "It is calm.",
+        ]
 
     def test_blockquote_keeps_its_marker_outside_and_its_lines_inside(self):
         chapter = _chapter(
@@ -170,10 +351,12 @@ class TestMarkersOfTheLevelsAndTheLeaves:
                 paragraph_class=BlockQuoteParagraph,
             ),
         )
-        assert _lines(chapter)[-3:] == [
+        assert _lines(chapter)[-5:] == [
             "<!-- page reader=v pdf=5 -->",
             "",
-            "> A quote. <!-- page reader=6 pdf=6 --> Goes on.",
+            "> A quote.",
+            "> <!-- page reader=6 pdf=6 -->",
+            "> Goes on.",
         ]
 
     def test_heading_is_preceded_by_the_marker_of_its_page(self):
@@ -205,6 +388,17 @@ class TestMarkersOfTheLevelsAndTheLeaves:
         chapter = _chapter(_paragraph(("First.", PAGE_IV)), layout=None)
         assert _lines(chapter)[:2] == ["## Chapter", ""]
 
+    def test_marker_before_a_sub_chapter_is_before_its_header(self):
+        sub_chapter = TopLevelChapterOfParagraphs("Sub chapter")
+        sub_chapter.page_layout = PAGE_V
+        sub_chapter.add_sublevel(_paragraph(("Deep text.", PAGE_V)))
+        sub_chapter.renumber_sublevels()
+        chapter = _chapter(_paragraph(("Before.", PAGE_IV)), sub_chapter)
+        lines = _lines(chapter)
+        assert lines[lines.index("<!-- page reader=v pdf=5 -->") + 2] == (
+            "### Sub chapter"
+        )
+
 
 class TestMarkersInWrappedLines:
     SENTENCES = [
@@ -220,48 +414,22 @@ class TestMarkersInWrappedLines:
         lines = _lines(chapter, page_markers, maximum_line_length)
         return lines[lines.index("## Chapter") + 2 :]
 
-    def test_a_marker_never_starts_a_line(self):
-        for maximum_line_length in (30, 45, 60, 80, 120):
+    def test_a_marker_is_a_line_of_its_own(self):
+        for maximum_line_length in (None, 30, 45, 60, 80, 120):
             lines = self._paragraph_lines(True, maximum_line_length)
-            assert not any(line.startswith("<!--") for line in lines), lines
-            assert sum(line.count("<!-- page") for line in lines) == 2
+            marker_lines = [line for line in lines if "<!-- page" in line]
+            assert len(marker_lines) == 2
+            assert all(MARKER_LINE.fullmatch(line) for line in marker_lines), lines
 
-    def test_lines_stay_within_the_limit_while_markers_stick_to_a_word(self):
-        for line in self._paragraph_lines(True, 60):
-            assert len(line) <= 60 + len("<!-- page reader=6 pdf=6 -->")
-
-    def test_without_the_markers_the_text_is_the_one_of_the_unmarked_markdown(self):
+    def test_without_the_markers_the_words_are_the_ones_of_the_unmarked_markdown(self):
         for maximum_line_length in (None, 45, 80):
-            marked = " ".join(self._paragraph_lines(True, maximum_line_length))
-            unmarked = " ".join(self._paragraph_lines(False, maximum_line_length))
-            assert INLINE_MARKER.sub("", marked).split() == unmarked.split()
-
-    def test_unlimited_line_is_the_unmarked_one_with_markers_inserted(self):
-        marked = self._paragraph_lines(True, None)[0]
-        unmarked = self._paragraph_lines(False, None)[0]
-        assert INLINE_MARKER.sub("", marked) == unmarked
-
-
-class TestMarkersOnTheirOwnLine:
-    """With on_own_line a marker within a paragraph is a line of its own: a
-    single newline on both sides, never a blank line (no new paragraph)."""
-
-    def test_marker_inside_a_paragraph_is_a_line_of_its_own(self):
-        chapter = _chapter(_paragraph(("First.", PAGE_IV), ("Second.", PAGE_V)))
-        assert _lines(chapter, on_own_line=True)[-3:] == [
-            "First.",
-            "<!-- page reader=v pdf=5 -->",
-            "Second.",
-        ]
-
-    def test_paragraph_count_is_the_one_of_the_inline_markers(self):
-        chapter = _chapter(
-            _paragraph(("First.", PAGE_IV), ("Second.", PAGE_V), ("Third.", PAGE_SIX))
-        )
-        inline = "\n".join(_lines(chapter))
-        on_own_line = "\n".join(_lines(chapter, on_own_line=True))
-        assert inline.count("\n\n") == on_own_line.count("\n\n")
-        assert inline.split() == on_own_line.split()
+            marked = [
+                line
+                for line in self._paragraph_lines(True, maximum_line_length)
+                if "<!-- page" not in line
+            ]
+            unmarked = self._paragraph_lines(False, maximum_line_length)
+            assert " ".join(marked).split() == " ".join(unmarked).split()
 
     def test_the_wrapped_lines_resume_after_the_marker(self):
         chapter = _chapter(
@@ -272,13 +440,26 @@ class TestMarkersOnTheirOwnLine:
                 ("Delta delta delta delta delta.", PAGE_V),
             )
         )
-        lines = _lines(chapter, maximum_line_length=50, on_own_line=True)
+        lines = _lines(chapter, maximum_line_length=50)
         assert lines[-4:] == [
             "Alpha alpha alpha alpha. Beta beta beta beta beta.",
             "<!-- page reader=v pdf=5 -->",
             "Gamma gamma gamma gamma.",
             "Delta delta delta delta delta.",
         ]
+
+
+class TestMarkersInsideParagraphs:
+    """A marker within a paragraph is a line of its own: a single newline on both
+    sides, never a blank line (no new paragraph)."""
+
+    def test_paragraph_count_is_the_one_of_the_unmarked_markdown(self):
+        chapter = _chapter(
+            _paragraph(("First.", PAGE_IV), ("Second.", PAGE_V), ("Third.", PAGE_SIX))
+        )
+        marked = "\n".join(_lines(chapter))
+        unmarked = "\n".join(_lines(chapter, page_markers=False))
+        assert marked.count("\n\n") == unmarked.count("\n\n") + 1  # the first marker
 
     def test_blockquote_marker_line_keeps_the_quote_prefix(self):
         chapter = _chapter(
@@ -288,7 +469,7 @@ class TestMarkersOnTheirOwnLine:
                 paragraph_class=BlockQuoteParagraph,
             ),
         )
-        assert _lines(chapter, on_own_line=True)[-3:] == [
+        assert _lines(chapter)[-3:] == [
             "> A quote.",
             "> <!-- page reader=6 pdf=6 -->",
             "> Goes on.",
@@ -299,15 +480,11 @@ class TestMarkersOnTheirOwnLine:
             _paragraph(("1. Zero.", PAGE_IV)),
             _paragraph(("2. First.", PAGE_IV), ("Second.", PAGE_V)),
         )
-        assert _lines(chapter, on_own_line=True)[-3:] == [
+        assert _lines(chapter)[-3:] == [
             "2. First.",
             "   <!-- page reader=v pdf=5 -->",
             "   Second.",
         ]
-
-    def test_on_their_own_line_by_default(self):
-        assert PageMarkerTracker().on_own_line
-        assert not PageMarkerTracker(on_own_line=False).on_own_line
 
 
 class TestMarkersInNumberedLists:
@@ -337,6 +514,20 @@ class TestMarkersInNumberedLists:
             "1. First item.",
         ]
 
+    def test_a_list_goes_on_across_a_page_break(self):
+        # The page break between the items is transparent for the heuristic:
+        # the second item is still the second item of the list.
+        chapter = _chapter(
+            _paragraph(("1. First item.", PAGE_IV)),
+            _paragraph(("2. Second item.", PAGE_V)),
+            _paragraph(("3. Third item.", PAGE_V)),
+        )
+        assert _lines(chapter)[-3:] == [
+            "2. Second item.",
+            "",
+            "3. Third item.",
+        ]
+
     @pytest.mark.parametrize(
         "text,role,indentation,expected",
         [
@@ -364,9 +555,7 @@ class TestMarkersInNumberedLists:
 class TestDocumentToMarkdown:
     def _document(self):
         chapter = _chapter(_paragraph(("Only sentence.", PAGE_IV)))
-        document = Document("Test")
-        document.add_chapter(chapter)
-        return document
+        return _document(chapter)
 
     def test_markers_are_written_when_asked_for(self, tmp_path):
         path = tmp_path / "with_markers.md"
@@ -392,6 +581,13 @@ class TestDocumentToMarkdown:
         document.knows_pages = False
         path = tmp_path / "no_pages.md"
         document.to_markdown(str(path))
+        assert "<!--" not in path.read_text()
+
+    def test_a_document_without_page_breaks_gets_no_markers(self, tmp_path):
+        document = Document("Test")
+        document.add_chapter(_chapter(_paragraph(("Only sentence.", PAGE_IV))))
+        path = tmp_path / "no_page_breaks.md"
+        document.to_markdown(str(path), page_markers=True)
         assert "<!--" not in path.read_text()
 
     def test_a_document_read_from_markdown_knows_no_pages(self, tmp_path):

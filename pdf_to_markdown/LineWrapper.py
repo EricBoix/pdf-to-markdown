@@ -16,17 +16,6 @@ class LineWrapper:
     _UNBREAKABLE_SPACE = "\x00"
 
     @classmethod
-    def glue(cls, sentence: str, comment: str) -> str:
-        """The sentence followed by an html comment that must neither start a
-        line nor be broken (e.g. a PageMarker): it sticks to the last word of
-        the sentence while the lines are broken, see wrap_sentences."""
-        return (
-            sentence
-            + cls._UNBREAKABLE_SPACE
-            + comment.replace(" ", cls._UNBREAKABLE_SPACE)
-        )
-
-    @classmethod
     def wrap(
         cls,
         text: str,

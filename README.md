@@ -70,11 +70,19 @@ converter.
 - A sentence belongs to the page where it starts. Between blocks a marker is a
   paragraph of its own; within a paragraph it is on a line of its own (one
   newline before and after, no blank line: paragraph and sentence counts are
-  unchanged). `page_markers_on_own_line=False` glues it to the previous
-  sentence instead.
+  unchanged).
+- The markers come from the page breaks of the document (`PageBreak`). They are
+  leaves of the tree, put by the `PageBreakInserter` as the last pass of the
+  construction of the document: a page break stands before each element, and
+  before each sentence of a paragraph, that is not on the page of what precedes
+  it. They are no element of the document: `get_sublevels()`, `get_chapters()`
+  and `get_sentences()` leave them aside (`get_sublevels_with_page_breaks()`
+  does not). The pages of the page breaks strictly increase in reading order;
+  the `PageBreakInserter` warns about the page that comes back or comes twice
+  (it raises when built with `strict=True`).
 - `document.to_markdown(path, page_markers=True/False)` overrides the switch. A
   document read from a markdown (`MarkdownToDocument`) has no pages, hence no
-  markers by default.
+  page breaks and no markers.
 
 ### Typographic rules
 

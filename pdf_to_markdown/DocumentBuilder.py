@@ -21,6 +21,7 @@ from .SentenceBreaker import SentenceBreaker
 from .TextSanitizer import TextSanitizer
 from .ParagraphMerger import ParagraphMerger
 from .BlockquoteDeduplicator import BlockquoteDeduplicator
+from .PageBreakInserter import PageBreakInserter
 from .SectionDropper import SectionDropper
 from .TableRegistry import SpanningCellText, TableRegistry
 
@@ -56,6 +57,7 @@ class DocumentBuilder(TextSanitizer, ABC):
         self._blockquote_deduplicator = BlockquoteDeduplicator(
             diagnostics=self._diagnostics
         )
+        self._page_break_inserter = PageBreakInserter(diagnostics=self._diagnostics)
 
     def build_document(self) -> None:
         """Build the Document object out of converter extracted chapters."""
@@ -78,6 +80,9 @@ class DocumentBuilder(TextSanitizer, ABC):
         # Once the paragraphs spreading over two pages are reconstituted the
         # blockquotes repeating a paragraph can be told apart.
         self._blockquote_deduplicator.remove_duplicated_blockquotes(self.document)
+        # Last, once the order of the text is final: the page breaks stand
+        # between what is on different pages.
+        self._page_break_inserter.insert_page_breaks(self.document)
 
     @abstractmethod
     def break_document_into_chapters(self) -> None:

@@ -22,7 +22,7 @@ from .NumberedListAnnotator import (
 from .LineWrapper import LineWrapper
 from .PageLayout import PageLayout
 from .DebugComments import DebugComments
-from .PageMarker import PageMarkerTracker
+from .PageMarker import PageMarker
 from .TableRegistry import SpanningCellText
 
 # Type variable for sublevel types in DocumentHierarchicalLevel
@@ -143,17 +143,19 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
         sublevel.set_owning_hierarchical_level(self)
 
     def get_sublevel(self, index: int) -> T:
-        if not self.sublevels or index >= len(self.sublevels):
+        sublevels = self.get_sublevels()
+        if not sublevels or index >= len(sublevels):
             raise ConverterError(
-                f"Sublevel index {index} out of bounds: should be smaller than {len(self.sublevels) if self.sublevels else 0}"
+                f"Sublevel index {index} out of bounds: should be smaller than {len(sublevels) if sublevels else 0}"
             )
-        return self.sublevels[index]
+        return sublevels[index]
 
     def get_last_sublevel(self) -> T | None:
-        if not self.sublevels:
+        sublevels = self.get_sublevels()
+        if not sublevels:
             self._logger.warning("No sublevels found.")
             return None
-        return self.sublevels[-1]
+        return sublevels[-1]
 
     def remove_sublevel(self, sublevel: T) -> None:
         """
@@ -165,16 +167,32 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
             raise ValueError("Sublevel not found.")
 
     def get_sublevels(self) -> list[T] | None:
+        """The elements of the document that this level holds (the page breaks,
+        that are no element, are left aside; see get_sublevels_with_page_breaks).
+        None when it has no sublevel at all."""
+        if self.sublevels is None or not any(
+            isinstance(sublevel, PageBreak) for sublevel in self.sublevels
+        ):
+            return self.sublevels
+        return [
+            sublevel
+            for sublevel in self.sublevels
+            if not isinstance(sublevel, PageBreak)
+        ]
+
+    def get_sublevels_with_page_breaks(self) -> list | None:
+        """The sublevels as they are written: the page breaks (see PageBreak) stand
+        between the elements that are on different pages."""
         return self.sublevels
 
     def leaves_in_reading_order(self):
-        """The paragraphs (the blockquotes among them), tables and headings
-        under this level, whatever their depth, in reading order.
+        """The paragraphs (the blockquotes among them), tables, headings and
+        page breaks under this level, whatever their depth, in reading order.
 
         A level with no sublevel has no leaf.
         """
-        for sublevel in self.get_sublevels() or []:
-            if isinstance(sublevel, (Paragraph, Table, Heading)):
+        for sublevel in self.get_sublevels_with_page_breaks() or []:
+            if isinstance(sublevel, (Paragraph, Table, Heading, PageBreak)):
                 yield sublevel
             elif isinstance(sublevel, DocumentHierarchicalLevel):
                 yield from sublevel.leaves_in_reading_order()
@@ -182,7 +200,7 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
                 raise ConverterError(
                     f"{type(sublevel).__name__} found among the sublevels of "
                     f"{self.name!r}: expected a level or a leaf (a Paragraph, a "
-                    "Table or a Heading)."
+                    "Table, a Heading or a PageBreak)."
                 )
 
     def set_name(self, name: str) -> None:
@@ -196,7 +214,14 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
 
     def renumber_sublevels(self) -> None:
         if self.sublevels:
-            for index, sublevel in enumerate(self.sublevels, start=1):
+            # A page break is no element of the document: it takes no number
+            # (and does not shift the ones of the elements).
+            numbered_sublevels = [
+                sublevel
+                for sublevel in self.sublevels
+                if not isinstance(sublevel, PageBreak)
+            ]
+            for index, sublevel in enumerate(numbered_sublevels, start=1):
                 sublevel.set_number(index)
 
     def has_page_number(self, page_number) -> bool:
@@ -226,6 +251,8 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
 
     def get_first_sublevel_of_given_page(self, page_number) -> T | None:
         for sublevel in self.sublevels:
+            if isinstance(sublevel, PageBreak):
+                continue
             if sublevel.page_layout.page_number == page_number:
                 return sublevel
         self._logger.warning(
@@ -236,6 +263,8 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
     def get_last_sublevel_of_given_page(self, page_number) -> T | None:
         sublevel_of_that_page = None
         for sublevel in self.sublevels:
+            if isinstance(sublevel, PageBreak):
+                continue
             if sublevel.page_layout.page_number == page_number:
                 sublevel_of_that_page = sublevel
         if sublevel_of_that_page is None:
@@ -296,41 +325,51 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
             header += DebugComments.only_if_enabled(cls.MARKDOWNLINT_DISABLE_MD026)
         return header
 
-    def to_markdown(
-        self, md_file: MdUtils, level, page_markers: PageMarkerTracker | None = None
-    ) -> None:
+    def to_markdown(self, md_file: MdUtils, level, page_markers: bool = False) -> None:
         """
         Add this hierarchical level's content to the given MdUtils object.
 
-        When a PageMarkerTracker is given, the page markers (see PageMarker) are
-        written where the page changes.
+        When page_markers is set, the page breaks (see PageBreak) are written as
+        page markers (see PageMarker): they are skipped otherwise.
         """
         if not self.name:
             raise ConverterError("No name for markdown conversion.")
-        if page_markers is not None:
-            page_marker_comment = page_markers.comment_for(self.page_layout)
-            if page_marker_comment is not None:
-                # Like the header, whatever precedes it (a level ends with a
-                # newline): never two blank lines (markdownlint rule MD012).
-                self._write_after_blank_line(md_file, page_marker_comment)
         # MdUtils.new_header() ends with a newline and MdUtils.new_paragraph()
         # starts with two newlines: a header followed by a paragraph would thus
         # get two blank lines instead of one. Hence we write the (atx) header
         # ourselves, without its trailing newline.
         header = self.get_header_line(self.name, level)
         self._write_after_blank_line(md_file, header)
-        if self.sublevels and not isinstance(
-            self.sublevels[0], (Paragraph, Table, Heading)
+        # (The page breaks are no sublevel of the document: get_sublevels leaves
+        # them aside.)
+        if self.get_sublevels() and not isinstance(
+            self.get_sublevels()[0], (Paragraph, Table, Heading)
         ):
             # A sub header (unlike a paragraph) does not start with a blank
             # line of its own: provide the blank line separating the headers.
             md_file.write("\n")
         if self.sublevels:
             self._heuristic_annotate_numbered_lists()
-            for sublevel in self.sublevels:
-                if sublevel is not None:
-                    sublevel.to_markdown(md_file, level + 1, page_markers=page_markers)
+            self.write_sublevels_to_markdown(
+                md_file, self.get_sublevels_with_page_breaks(), level + 1, page_markers
+            )
         md_file.new_line()
+
+    @staticmethod
+    def write_sublevels_to_markdown(
+        md_file: MdUtils, sublevels: list, level, page_markers: bool
+    ) -> None:
+        """Add the sublevels (levels, leaves and page breaks) to the given MdUtils
+        object, in order. A page break is written in the way the element that
+        follows it needs (see PageBreak)."""
+        for index, sublevel in enumerate(sublevels):
+            if sublevel is None:
+                continue
+            if isinstance(sublevel, PageBreak):
+                following = sublevels[index + 1] if index + 1 < len(sublevels) else None
+                sublevel.to_markdown(md_file, level, page_markers, following)
+            else:
+                sublevel.to_markdown(md_file, level, page_markers=page_markers)
 
     @staticmethod
     def _write_after_blank_line(md_file: MdUtils, text: str) -> None:
@@ -355,11 +394,13 @@ class DocumentHierarchicalLevel(ABC, Generic[T], Numbered, Parent):
             self.hierarchical_toplevel, "numbered_list_heuristics_enabled", True
         ):
             return
+        # (A page break is transparent: a numbered list goes on across it.)
+        sublevels = self.get_sublevels()
         paragraph_texts = [
-            self._get_text_for_list_heuristics(sublevel) for sublevel in self.sublevels
+            self._get_text_for_list_heuristics(sublevel) for sublevel in sublevels
         ]
         placements = NumberedListAnnotator().heuristic_annotate(paragraph_texts)
-        for sublevel, placement in zip(self.sublevels, placements):
+        for sublevel, placement in zip(sublevels, placements):
             if isinstance(sublevel, (Paragraph, Table)):
                 sublevel.numbered_list_placement = placement
 
@@ -388,6 +429,7 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
         self.numbered_list_placement = NumberedListPlacement()
 
     remove_sentence = DocumentHierarchicalLevel.remove_sublevel
+    # (The page breaks among the sentences are left aside.)
     get_sentences = DocumentHierarchicalLevel.get_sublevels
 
     def get_document_reference_long(self) -> str:
@@ -400,53 +442,33 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
         self,
         md_file: MdUtils,
         dummy_level,
-        page_markers: PageMarkerTracker | None = None,
+        page_markers: bool = False,
     ) -> None:
         """
         Add this paragraph's content to the given MdUtils object.
         Overrides base class to output sentences instead of sublevels.
+
+        The page break that precedes the paragraph is written by the owning
+        level (see PageBreak), those within the paragraph by _get_markdown_lines.
         """
-        sentences = self.get_sublevels()
+        sentences = self.get_sentences()
         if not sentences:
             self._logger.warning("Useless paragraph with no sentences.")
             self._logger.warning("Optimisation inquiry required.")
             return
-        self._write_page_marker(md_file, page_markers)
         # Note: we can not delegate the markdown generation to
         # Sentence.to_markdown() since we would have to use md_file.new_line()
         # which (as expected) adds an unwanted mandatory line break
         md_file.new_paragraph(self._get_markdown_lines(page_markers))
 
-    def _write_page_marker(
-        self, md_file: MdUtils, page_markers: PageMarkerTracker | None
-    ) -> None:
-        """Write the marker of the page this paragraph starts on, when it is a
-        change of page (see PageMarker).
-
-        The marker is a paragraph of its own, indented so that it does not end
-        the numbered list that this paragraph belongs to (see
-        NumberedListAnnotator.indentation_of_comment_before). The markers of the
-        pages that the following sentences start are written within the
-        paragraph, see _get_markdown_lines.
-        """
-        if page_markers is None:
-            return
-        comment = page_markers.comment_for(self.get_sublevels()[0].page_layout)
-        if comment is None:
-            return
-        indentation = NumberedListAnnotator.indentation_of_comment_before(
-            self.get_markdown_text(), self.numbered_list_placement
-        )
-        md_file.new_paragraph(" " * indentation + comment)
-
     def get_markdown_text(self) -> str:
         """The text of the paragraph, as written in markdown (no list role)."""
-        return " ".join([sentence.text for sentence in self.get_sublevels()])
+        return " ".join([sentence.text for sentence in self.get_sentences()])
 
     # What every line of the paragraph starts with (e.g. "> " of a blockquote)
     LINE_MARKER = ""
 
-    def _get_markdown_lines(self, page_markers: PageMarkerTracker | None = None) -> str:
+    def _get_markdown_lines(self, page_markers: bool = False) -> str:
         """The paragraph as emitted: list role applied, then lines broken.
 
         The lines are broken last, once the numbered list role is known (it
@@ -454,11 +476,8 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
         at the end of sentences when possible (see LineWrapper). Lines are
         only separated by a single newline: no new paragraph is introduced.
 
-        A sentence that starts a page that the previous sentence is not on is
-        preceded by the marker of that page (see PageMarker), that sticks to the
-        end of the previous sentence: it never starts a line. With the tracker
-        option on_own_line the marker is instead a line of its own, between the
-        two sentences.
+        A page break between two sentences (see PageBreak) is, when the page
+        markers are asked for, a line of its own, between the two sentences.
         """
         placement = self.numbered_list_placement
         failed = placement.role == NumberedListRole.FAILED
@@ -472,25 +491,17 @@ class Paragraph(DocumentHierarchicalLevel[Sentence]):
                 self.get_markdown_text(), placement
             )
         ) + self.LINE_MARKER
-        sentences = self.get_sublevels()
         # The texts of the sentences, cut where a marker stands on a line of
         # its own: segments[index + 1] follows the marker comments[index].
         segments: list[list[str]] = [[]]
         comments: list[str] = []
-        for index, sentence in enumerate(sentences):
-            # The page of the first sentence was dealt with by
-            # _write_page_marker.
-            comment = (
-                page_markers.comment_for(sentence.page_layout)
-                if page_markers is not None and index > 0
-                else None
-            )
-            if comment is not None and page_markers.on_own_line:
-                comments.append(comment)
-                segments.append([])
-            elif comment is not None:
-                segments[-1][-1] = LineWrapper.glue(segments[-1][-1], comment)
-            segments[-1].append(sentence.text)
+        for sublevel in self.get_sublevels_with_page_breaks():
+            if isinstance(sublevel, PageBreak):
+                if page_markers:
+                    comments.append(sublevel.comment)
+                    segments.append([])
+                continue
+            segments[-1].append(sublevel.text)
         maximum_line_length = getattr(
             self.hierarchical_toplevel, "maximum_line_length", None
         )
@@ -530,14 +541,13 @@ class BlockQuoteParagraph(Paragraph):
         self,
         md_file: MdUtils,
         dummy_level,
-        page_markers: PageMarkerTracker | None = None,
+        page_markers: bool = False,
     ) -> None:
-        sentences = self.get_sublevels()
+        sentences = self.get_sentences()
         if not sentences:
             self._logger.warning("Useless blockquote paragraph with no sentences.")
             return
         # (The marker of a page change stands outside of the blockquote.)
-        self._write_page_marker(md_file, page_markers)
         md_file.new_paragraph(self._get_markdown_lines(page_markers))
 
     def get_markdown_text(self) -> str:
@@ -594,19 +604,17 @@ class Table(Numbered, Parent):
         self,
         md_file: MdUtils,
         dummy_level,
-        page_markers: PageMarkerTracker | None = None,
+        page_markers: bool = False,
     ) -> None:
-        """Add this table to the given MdUtils object."""
+        """Add this table to the given MdUtils object.
+
+        The page break that precedes the table goes before it (never between its
+        rows), indented like the table, see PageBreak.
+        """
         if not self.rows:
             self._logger.warning(f"Useless table {self.name!r} with no rows.")
             return
         indentation = " " * self.numbered_list_placement.indentation
-        if page_markers is not None:
-            # The marker of a page change goes before the table (never between
-            # its rows), indented like the table (see PageMarker).
-            page_marker_comment = page_markers.comment_for(self.page_layout)
-            if page_marker_comment is not None:
-                md_file.new_paragraph(indentation + page_marker_comment)
         if self.has_column_headings and self.caption:
             # A line above the table (not emphasized, which would trigger the
             # markdownlint rule MD036).
@@ -673,17 +681,79 @@ class Heading(Numbered, Parent):
         page_reader = self.page_layout.reader_page_number if self.page_layout else "?"
         return f"Heading {self.name!r} (page {page_reader})"
 
-    def to_markdown(
-        self, md_file: MdUtils, level, page_markers: PageMarkerTracker | None = None
-    ) -> None:
+    def to_markdown(self, md_file: MdUtils, level, page_markers: bool = False) -> None:
         """Add this heading to the given MdUtils object."""
-        if page_markers is not None:
-            page_marker_comment = page_markers.comment_for(self.page_layout)
-            if page_marker_comment is not None:
-                md_file.new_paragraph(page_marker_comment)
         md_file.new_paragraph(
             DocumentHierarchicalLevel.get_header_line(self.name, level)
         )
+
+
+class PageBreak(Parent):
+    """Where the document goes on to another page of the original document.
+
+    A page break is a leaf of the hierarchy, like a Table or a Heading, but it is
+    no element of the document: it is not numbered and it holds no text. It is
+    put in the document by the PageBreakInserter, once the document is built:
+    - before a level, a paragraph, a table or a heading that is not on the page
+      of what precedes it;
+    - in the paragraph, before a sentence that is not on the page of the
+      previous one (a sentence that a page break cuts belongs to the page where
+      it starts).
+    Hence the pages of the page breaks, in reading order, are those of the pages
+    of the document, with no page twice and none going backwards.
+
+    It is written in the markdown as a page marker (see PageMarker), when the
+    page markers are asked for (see DocumentHierarchicalRoot.to_markdown).
+    """
+
+    def __init__(self, layout: PageLayout) -> None:
+        Parent.__init__(self)
+        self.page_layout = layout.__copy__()
+
+    @property
+    def comment(self) -> str:
+        """The page marker, as an html comment."""
+        return PageMarker.from_layout(self.page_layout).to_comment()
+
+    def get_sentences(self) -> None:
+        """A page break has no sentences (this is for the callers walking paragraphs)."""
+        return None
+
+    def to_markdown(
+        self,
+        md_file: MdUtils,
+        dummy_level,
+        page_markers: bool = False,
+        following=None,
+    ) -> None:
+        """Add the page marker to the given MdUtils object, written the way what
+        follows it needs, when the page markers are asked for.
+
+        A page break within a paragraph is written by the paragraph itself (a
+        line of its own, see Paragraph._get_markdown_lines). This one stands
+        before the element that follows it:
+        - a paragraph: the marker is a paragraph of its own, indented so that it
+          does not end the numbered list that the paragraph belongs to (see
+          NumberedListAnnotator.indentation_of_comment_before);
+        - a table: indented like the table;
+        - a heading: a paragraph of its own;
+        - a level: like its header, whatever precedes it (a level ends with a
+          newline): never two blank lines (markdownlint rule MD012).
+        """
+        if not page_markers:
+            return
+        if isinstance(following, Paragraph):
+            indentation = NumberedListAnnotator.indentation_of_comment_before(
+                following.get_markdown_text(), following.numbered_list_placement
+            )
+            md_file.new_paragraph(" " * indentation + self.comment)
+        elif isinstance(following, Table):
+            indentation = " " * following.numbered_list_placement.indentation
+            md_file.new_paragraph(indentation + self.comment)
+        elif isinstance(following, Heading):
+            md_file.new_paragraph(self.comment)
+        else:
+            DocumentHierarchicalLevel._write_after_blank_line(md_file, self.comment)
 
 
 class TopLevelChapter:
@@ -801,29 +871,25 @@ class DocumentHierarchicalRoot:
         self,
         filepath: str,
         page_markers: bool | None = None,
-        page_markers_on_own_line: bool = True,
     ) -> None:
         """
         Generate a markdown file representing the document.
 
-        :param page_markers: write the page markers (see PageMarker) where the
-            page changes. None leaves the choice to the debug comments (see
-            DebugComments), and to whether the document knows its pages. Meant for the documents extracted from a pdf: the
-            pages of the other ones are not known.
-        :param page_markers_on_own_line: write a marker standing within a
-            paragraph on a line of its own (the default), instead of
-            glued to the previous sentence (see PageMarkerTracker).
+        :param page_markers: write the page markers (see PageMarker) of the page
+            breaks of the document (see PageBreak), where the page changes. None
+            leaves the choice to the debug comments (see DebugComments), and to
+            whether the document knows its pages. Meant for the documents
+            extracted from a pdf: the pages of the other ones are not known (and
+            have no page break).
         """
         md_file = MdUtils(
             file_name=filepath, title=self.title, title_header_style="atx"
         )
         if page_markers is None:
             page_markers = DebugComments.enabled() and self.knows_pages
-        page_marker_tracker = (
-            PageMarkerTracker(page_markers_on_own_line) if page_markers else None
+        DocumentHierarchicalLevel.write_sublevels_to_markdown(
+            md_file, self.get_chapters_with_page_breaks() or [], 2, page_markers
         )
-        for chapter in self.get_chapters():
-            chapter.to_markdown(md_file, level=2, page_markers=page_marker_tracker)
         # Appending a "table a content" makes the Markdown to Pdf conversion
         # fail. This is because (well inquire on that) converting the table of
         # contents requires converting markdown links (things of the form
@@ -846,6 +912,9 @@ class DocumentOfChapters(DocumentHierarchicalRoot, DocumentHierarchicalLevel[T])
 
     add_chapter = DocumentHierarchicalLevel.add_sublevel
     get_chapters = DocumentHierarchicalLevel.get_sublevels
+    get_chapters_with_page_breaks = (
+        DocumentHierarchicalLevel.get_sublevels_with_page_breaks
+    )
 
 
 class Document(DocumentOfChapters[TopLevelChapterOfParagraphs]):

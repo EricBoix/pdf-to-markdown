@@ -21,13 +21,11 @@ class PageMarker:
 
     A marker stands before the first sentence that is on its page: a sentence
     that a page break cuts belongs to the page where it starts. Within a
-    paragraph the marker is by default written on a line of its own, the
-    paragraph text resuming on the next line (a single newline before and after:
-    no blank line, hence no new paragraph in the source markdown: the
-    chapter / paragraph / sentence numbering is unchanged). With the
-    PageMarkerTracker option on_own_line=False it is instead glued to the end of
-    the previous sentence (it never starts a line, which would turn the line
-    into an html block).
+    paragraph the marker is written on a line of its own, the paragraph text
+    resuming on the next line (a single newline before and after: no blank line,
+    hence no new paragraph in the source markdown: the chapter / paragraph /
+    sentence numbering is unchanged). The markers come from the page breaks of
+    the document (see PageBreak).
     """
 
     reader_page_number: int | str
@@ -53,28 +51,3 @@ class PageMarker:
     def to_comment(self) -> str:
         reader = quote(str(self.reader_page_number), safe="")
         return f"<!-- page reader={reader} pdf={self.pdf_page_number} -->"
-
-
-class PageMarkerTracker:
-    """What the writing of a markdown file remembers in order to place the
-    page markers: the page of the text written last.
-
-    *on_own_line* tells whether a marker standing within a paragraph is written
-    on a line of its own (the default) or glued to the previous sentence (see
-    PageMarker).
-    """
-
-    def __init__(self, on_own_line: bool = True) -> None:
-        self._pdf_page_number: int | None = None
-        self.on_own_line = on_own_line
-
-    def comment_for(self, layout: PageLayout | None) -> str | None:
-        """The comment to write before a text of the given layout.
-
-        None when that text is on the page of the text written last (or when
-        its page is not known). The text is then the one written last.
-        """
-        if layout is None or layout.page_number == self._pdf_page_number:
-            return None
-        self._pdf_page_number = layout.page_number
-        return PageMarker.from_layout(layout).to_comment()
